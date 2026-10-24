@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tracking Hub – Functional Prototype</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #f6f8fc;
+      --panel: #fff;
+      --text: #172033;
+      --muted: #6f7a90;
+      --line: #e5e9f2;
+      --nav: #0f172a;
+      --purple: #6d4aff;
+      --purple2: #8b6cff;
+      --green: #22b573;
+      --red: #ff5b5b;
+      --blue: #3d8bfd;
+      --amber: #f7b73b;
+      --shadow: 0 8px 24px rgba(30, 42, 70, .07)
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text)
+    }
+
+    button,
+    input,
+    select {
+      font: inherit
+    }
+
+    .app {
+      display: flex;
+      min-height: 100vh
+    }
+
+    .sidebar {
+      width: 225px;
+      background: linear-gradient(180deg, #10182b, #0b1222);
+      color: #fff;
+      padding: 20px 13px;
+      position: fixed;
+      inset: 0 auto 0 0;
+      z-index: 10
+    }
+
+    .brand {
+      font-size: 22px;
+      font-weight: 800;
+      margin: 0 10px 22px;
+      display: flex;
+      gap: 10px;
+      align-items: center
+    }
+
+    .brand-badge {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #7a5cff, #a855f7)
+    }
+
+    .nav a {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      color: #dbe3f2;
+      text-decoration: none;
+      padding: 12px 14px;
+      border-radius: 10px;
+      margin-bottom: 6px;
+      cursor: pointer
+    }
+
+    .nav a.active,
+    .nav a:hover {
+      background: linear-gradient(90deg, rgba(109, 74, 255, .38), rgba(109, 74, 255, .18));
+      color: #fff
+    }
+
+    .userbox {
+      position: absolute;
+      bottom: 20px;
+      left: 15px;
+      right: 15px;
+      padding: 12px;
+      border: 1px solid rgba(255, 255, 255, .12);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, .04)
+    }
+
+    .main {
+      margin-left: 225px;
+      width: calc(100% - 225px);
+      padding: 22px
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: center;
+      margin-bottom: 20px
+    }
+
+    .title h1 {
+      margin: 0;
+      font-size: 28px
+    }
+
+    .title p {
+      margin: 4px 0 0;
+      color: var(--muted)
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap
+    }
+
+    .pill,
+    .btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 10px;
+      padding: 9px 12px
+    }
+
+    .btn {
+      cursor: pointer
+    }
+
+    .btn.primary {
+      background: var(--purple);
+      color: white;
+      border-color: var(--purple)
+    }
+
+    .btn.red {
+      background: #fff0f0;
+      color: #c84040
+    }
+
+    .btn.green {
+      background: #ecfbf3;
+      color: #127b4d
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px
+    }
+
+    .kpis {
+      grid-template-columns: repeat(4, 1fr)
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: var(--shadow)
+    }
+
+    .kpi-label {
+      color: var(--muted);
+      font-size: 13px
+    }
+
+    .kpi-value {
+      font-size: 28px;
+      font-weight: 800;
+      margin-top: 5px
+    }
+
+    .kpi-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 5px
+    }
+
+    .green {
+      color: var(--green)
+    }
+
+    .redtxt {
+      color: var(--red)
+    }
+
+    .purple {
+      color: var(--purple)
+    }
+
+    .screen {
+      display: none
+    }
+
+    .screen.active {
+      display: block
+    }
+
+    .layout2 {
+      grid-template-columns: 1.2fr .8fr
+    }
+
+    .layout3 {
+      grid-template-columns: repeat(3, 1fr)
+    }
+
+    .panel-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px
+    }
+
+    .panel-title h3 {
+      margin: 0;
+      font-size: 17px
+    }
+
+    .chart-wrap {
+      height: 250px
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px
+    }
+
+    th,
+    td {
+      padding: 11px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      white-space: nowrap
+    }
+
+    th {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 700;
+      background: #fafbfe
+    }
+
+    .table-wrap {
+      overflow-x: auto
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700
+    }
+
+    .tag.real {
+      background: #eaf8f1;
+      color: #14824f
+    }
+
+    .tag.dummy {
+      background: #fff0f0;
+      color: #d14343
+    }
+
+    .tag.active {
+      background: #edf8ff;
+      color: #2467d1
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px
+    }
+
+    label {
+      font-size: 12px;
+      color: var(--muted)
+    }
+
+    input,
+    select {
+      width: 100%;
+      margin-top: 6px;
+      border: 1px solid var(--line);
+      padding: 10px;
+      border-radius: 9px;
+      background: #fff
+    }
+
+    .calc {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-top: 14px
+    }
+
+    .mini {
+      background: #f8f9fc;
+      border: 1px solid var(--line);
+      padding: 12px;
+      border-radius: 10px
+    }
+
+    .mini small {
+      color: var(--muted)
+    }
+
+    .mini strong {
+      display: block;
+      font-size: 18px;
+      margin-top: 5px
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 14px
+    }
+
+    .tab {
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 10px;
+      cursor: pointer
+    }
+
+    .tab.active {
+      background: var(--purple);
+      color: #fff;
+      border-color: var(--purple)
+    }
+
+    .subscreen {
+      display: none
+    }
+
+    .subscreen.active {
+      display: block
+    }
+
+    .progress {
+      height: 9px;
+      background: #edf0f6;
+      border-radius: 999px;
+      overflow: hidden
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, var(--purple), var(--purple2))
+    }
+
+    .lockbox {
+      text-align: center;
+      padding: 38px
+    }
+
+    .lockicon {
+      font-size: 48px
+    }
+
+    .muted {
+      color: var(--muted)
+    }
+
+    .hidden-metric {
+      letter-spacing: 3px
+    }
+
+    .statline {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px dashed var(--line)
+    }
+
+    .statline:last-child {
+      border-bottom: 0
+    }
+
+    .notice {
+      padding: 12px;
+      border-radius: 10px;
+      background: #f4f1ff;
+      color: #4b3bb3;
+      font-size: 13px
+    }
+
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      background: #111827;
+      color: #fff;
+      padding: 12px 16px;
+      border-radius: 10px;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: .2s;
+      pointer-events: none;
+      z-index: 99
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0)
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, .45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 50
+    }
+
+    .modal.show {
+      display: flex
+    }
+
+    .modal-card {
+      width: min(560px, 92vw);
+      background: #fff;
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: var(--shadow)
+    }
+
+    .row-actions {
+      display: flex;
+      gap: 6px
+    }
+
+    @media(max-width:1100px) {
+      .kpis {
+        grid-template-columns: repeat(2, 1fr)
+      }
+
+      .layout2,
+      .layout3 {
+        grid-template-columns: 1fr
+      }
+
+      .form-grid {
+        grid-template-columns: 1fr 1fr
+      }
+
+      .calc {
+        grid-template-columns: 1fr 1fr
+      }
+    }
+
+    @media(max-width:760px) {
+      .sidebar {
+        display: none
+      }
+
+      .main {
+        margin-left: 0;
+        width: 100%
+      }
+
+      .kpis,
+      .form-grid,
+      .calc {
+        grid-template-columns: 1fr
+      }
+
+      .topbar {
+        flex-direction: column;
+        align-items: flex-start
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-badge"></span>Tracking Hub</div>
+      <nav class="nav" id="sideNav">
+        <a class="active" data-screen="dashboard">⌂ Dashboard</a>
+        <a data-screen="addOrder">＋ Add Order</a>
+        <a data-screen="orders">☷ Orders</a>
+        <a data-screen="accounts">◉ Accounts</a>
+        <a data-screen="managers">♙ Sales Managers</a>
+        <a data-screen="reports">▥ Reports</a>
+        <a data-screen="private">🔒 Private Finance</a>
+        <a data-screen="settings">⚙ Settings</a>
+      </nav>
+      <div class="userbox">
+        <div style="font-weight:700">Mahin</div>
+        <div style="font-size:12px;color:#9ca8bf">Administrator</div>
+      </div>
+    </aside>
+
+    <main class="main">
+
+      <section id="dashboard" class="screen active">
+        <div class="topbar">
+          <div class="title">
+            <h1>Dashboard</h1>
+            <p>Overview of real sales and account performance.</p>
+          </div>
+          <div class="top-actions">
+            <button class="btn" onclick="exportCSV()">Export CSV</button>
+            <button class="btn" onclick="window.print()">Print</button>
+          </div>
+        </div>
+        <div class="grid kpis" id="dashboardKpis"></div>
+        <div class="grid layout2" style="margin-top:14px">
+          <div class="card">
+            <div class="panel-title">
+              <h3>Sales by Platform</h3><span class="pill">Real orders</span>
+            </div>
+            <div class="chart-wrap"><canvas id="platformChart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="panel-title">
+              <h3>Sales by Account</h3><span class="pill">Real orders</span>
+            </div>
+            <div class="chart-wrap"><canvas id="accountChart"></canvas></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:14px">
+          <div class="panel-title">
+            <h3>Account Summary</h3><button class="btn" onclick="go('accounts')">View All</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Account</th>
+                  <th>Real Orders</th>
+                  <th>Total Sales</th>
+                  <th>Net Revenue</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="dashAccountRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="addOrder" class="screen">
+        <div class="topbar">
+          <div class="title">
+            <h1>Add New Order</h1>
+            <p>Calculations are automatic from your saved rules.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="form-grid">
+            <label>Account<select id="orderAccount"></select></label>
+            <label>Platform<select id="orderPlatform">
+                <option>Wix</option>
+                <option>Squarespace</option>
+                <option>WordPress</option>
+                <option>Shopify</option>
+                <option>Webflow</option>
+              </select></label>
+            <label>Order Type<select id="orderType" onchange="calculateOrderPreview()">
+                <option value="real">Real</option>
+                <option value="dummy">Dummy</option>
+              </select></label>
+            <label>Order Amount ($)<input id="orderAmount" type="number" step="0.01" value="350"
+                oninput="calculateOrderPreview()"></label>
+            <label>Service Fee ($)<input id="orderService" type="number" step="0.01" value="0"
+                oninput="calculateOrderPreview()"></label>
+            <label>Discount (%)<input id="orderDiscount" type="number" step="0.01" value="0"
+                oninput="calculateOrderPreview()"></label>
+            <label>Platform Fee (%)<input id="orderPlatformFee" type="number" step="0.01" value="20"
+                oninput="calculateOrderPreview()"></label>
+            <label>Sales Manager<select id="orderManager"></select></label>
+            <label>Date<input id="orderDate" type="date"></label>
+            <label>Status<select id="orderStatus">
+                <option>Completed</option>
+                <option>Pending</option>
+                <option>Cancelled</option>
+              </select></label>
+            <label style="grid-column:span 2">Notes<input id="orderNotes" placeholder="Optional notes"></label>
+          </div>
+          <div class="calc">
+            <div class="mini"><small>Buyer Paid</small><strong id="buyerPaid">$350.00</strong></div>
+            <div class="mini"><small>Platform Fee</small><strong id="feeOut">$70.00</strong></div>
+            <div class="mini"><small>Seller Receives</small><strong id="sellerReceives">$280.00</strong></div>
+            <div class="mini"><small>Profit / Loss</small><strong id="profitLoss">$280.00</strong></div>
+          </div>
+          <div class="notice" style="margin-top:14px">Dummy loss stays hidden from normal dashboard screens and appears
+            only in Private Finance.</div>
+          <button class="btn primary" style="margin-top:12px" onclick="saveOrder()">Save Order</button>
+        </div>
+      </section>
+
+      <section id="orders" class="screen">
+        <div class="topbar">
+          <div class="title">
+            <h1>Orders</h1>
+            <p>Search, filter, edit and delete orders.</p>
+          </div><button class="btn primary" onclick="go('addOrder')">+ Add Order</button>
+        </div>
+        <div class="card">
+          <div class="form-grid" style="grid-template-columns:repeat(4,1fr)">
+            <label>Account<select id="filterAccount" onchange="renderOrders()">
+                <option value="">All Accounts</option>
+              </select></label>
+            <label>Platform<select id="filterPlatform" onchange="renderOrders()">
+                <option value="">All Platforms</option>
+                <option>Wix</option>
+                <option>Squarespace</option>
+                <option>WordPress</option>
+                <option>Shopify</option>
+                <option>Webflow</option>
+              </select></label>
+            <label>Order Type<select id="filterType" onchange="renderOrders()">
+                <option value="">All Types</option>
+                <option value="real">Real</option>
+                <option value="dummy">Dummy</option>
+              </select></label>
+            <label>Search<input id="filterSearch" placeholder="Search..." oninput="renderOrders()"></label>
+          </div>
+          <div class="table-wrap" style="margin-top:14px">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Account</th>
+                  <th>Platform</th>
+                  <th>Type</th>
+                  <th>Order</th>
+                  <th>Buyer Paid</th>
+                  <th>Seller Receives</th>
+                  <th>Manager</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="ordersRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="accounts" class="screen">
+        <div class="topbar">
+          <div class="title">
+            <h1>Accounts</h1>
+            <p>Compare every account by platform, real sales and order volume.</p>
+          </div><button class="btn primary" onclick="openAccountModal()">+ New Account</button>
+        </div>
+        <div class="card" style="margin-bottom:14px">
+          <div class="panel-title">
+            <div>
+              <h3>Account × Platform Sales Summary</h3>
+              <p class="muted" style="margin:4px 0 0">Dummy loss is hidden here and remains available only inside
+                Private Finance.</p>
+            </div><span class="pill">Live from saved orders</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Account</th>
+                  <th>Platform</th>
+                  <th>Real Orders</th>
+                  <th>Dummy Orders</th>
+                  <th>Total Orders</th>
+                  <th>Real Sales</th>
+                  <th>Net Revenue</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="accountPlatformRows"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="grid layout3" id="accountCards"></div>
+      </section>
+
+      <section id="accountDetails" class="screen">
+        <div class="topbar">
+          <div class="title">
+            <h1 id="accountTitle">Account</h1>
+            <p>Account-level overview and order history.</p>
+          </div><button class="btn" onclick="go('accounts')">← Back</button>
+        </div>
+        <div class="tabs">
+          <button class="tab active" onclick="subtab('accOverview',this)">Overview</button>
+          <button class="tab" onclick="subtab('accOrders',this)">Orders</button>
+          <button class="tab" onclick="subtab('accPlatforms',this)">Platform Breakdown</button>
+        </div>
+        <div id="accOverview" class="subscreen active"></div>
+        <div id="accOrders" class="subscreen"></div>
+        <div id="accPlatforms" class="subscreen"></div>
+      </section>
+
+      <section id="managers" class="screen">
+        <div class="topbar">
+          <div class="title">
+            <h1>Sales Managers</h1>
+            <p>Track targets and sales performance.</p>
+          </div><button class="btn primary" onclick="openManagerModal()">+ Add Manager</button>
+        </div>
+        <div class="grid layout3" id="managerCards"></div>
+      </section>
+
+      <section id="reports" class="screen">
+        <div class="topbar">
+          <div class="title">
+            <h1>Reports</h1>
+            <p>Generate summaries from the stored data.</p>
+          </div>
+        </div>
+        <div class="grid layout3">
+          <div class="card">
+            <h3>Company Summary</h3>
+            <p class="muted">Real sales, net revenue and order counts.</p><button class="btn primary"
+              onclick="generateReport('company')">Generate</button>
+          </div>
+          <div class="card">
+            <h3>Account Report</h3>
+            <p class="muted">Breakdown by account and platform.</p><button class="btn primary"
+              onclick="generateReport('account')">Generate</button>
+          </div>
+          <div class="card">
+            <h3>Manager Report</h3>
+            <p class="muted">Sales vs target by manager.</p><button class="btn primary"
+              onclick="generateReport('manager')">Generate</button>
+          </div>
+        </div>
+        <div id="reportOutput" class="card" style="margin-top:14px">
+          <h3>Report Output</h3>
+          <p class="muted">Choose a report above.</p>
+        </div>
+      </section>
+
+      <section id="private" class="screen">
+        <div class="topbar">
+          <div class="title">
+            <h1>Private Finance 🔒</h1>
+            <p>Dummy-order investment and loss data.</p>
+          </div>
+        </div>
+        <div id="lockScreen" class="card lockbox">
+          <div class="lockicon">🔒</div>
+          <h2>Restricted Area</h2>
+          <p class="muted">Enter your admin PIN.</p>
+          <div style="max-width:320px;margin:16px auto"><input id="pinInput" type="password" placeholder="PIN"><button
+              class="btn primary" style="width:100%;margin-top:10px" onclick="unlockFinance()">Unlock</button></div>
+        </div>
+        <div id="privateContent" style="display:none">
+          <div class="grid kpis" id="privateKpis"></div>
+          <div class="card" style="margin-top:14px">
+            <div class="panel-title">
+              <h3>Private Platform Breakdown</h3><button class="btn red" onclick="lockFinance()">Lock Again</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Platform</th>
+                    <th>Dummy Orders</th>
+                    <th>Investment</th>
+                    <th>Dummy Loss</th>
+                  </tr>
+                </thead>
+                <tbody id="privatePlatformRows"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card" style="margin-top:14px">
+            <h3>Dummy Orders</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Account</th>
+                    <th>Platform</th>
+                    <th>Order</th>
+                    <th>Buyer Paid</th>
+                    <th>Seller Receives</th>
+                    <th>Loss</th>
+                  </tr>
+                </thead>
+                <tbody id="dummyRows"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="settings" class="screen">
+        <div class="topbar">
+          <div class="title">
+            <h1>Settings</h1>
+            <p>Calculation defaults, admin PIN and data controls.</p>
+          </div>
+        </div>
+        <div class="grid layout2">
+          <div class="card">
+            <h3>Calculation Rules</h3>
+            <label>Default Real Platform Fee (%)<input id="settingRealFee" type="number" step="0.01"></label>
+            <label>Dummy Seller Payout (%)<input id="settingDummyPayout" type="number" step="0.01"></label>
+            <label>Default Discount (%)<input id="settingDiscount" type="number" step="0.01"></label>
+            <button class="btn primary" style="margin-top:14px" onclick="saveSettings()">Save Settings</button>
+          </div>
+          <div class="card">
+            <h3>Privacy & Data</h3>
+            <label>Admin PIN<input id="settingPin" type="password"></label>
+            <button class="btn primary" style="margin-top:14px" onclick="savePin()">Update PIN</button>
+            <div style="margin-top:18px"><button class="btn" onclick="downloadBackup()">Download Backup JSON</button>
+              <button class="btn" onclick="document.getElementById('restoreInput').click()">Restore
+                Backup</button><input id="restoreInput" type="file" accept=".json" style="display:none"
+                onchange="restoreBackup(event)"></div>
+            <button class="btn red" style="margin-top:14px" onclick="resetDemo()">Reset Demo Data</button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <div id="accountModal" class="modal">
+    <div class="modal-card">
+      <div class="panel-title">
+        <h3 id="accountModalTitle">Add Account</h3><button class="btn" onclick="closeModal('accountModal')">×</button>
+      </div>
+      <input type="hidden" id="editAccountId">
+      <label>Account Name<input id="accountName"></label>
+      <label>Active<select id="accountActive">
+          <option value="true">Yes</option>
+          <option value="false">No</option>
+        </select></label>
+      <button class="btn primary" style="margin-top:14px" onclick="saveAccount()">Save</button>
+    </div>
+  </div>
+
+  <div id="managerModal" class="modal">
+    <div class="modal-card">
+      <div class="panel-title">
+        <h3 id="managerModalTitle">Add Manager</h3><button class="btn" onclick="closeModal('managerModal')">×</button>
+      </div>
+      <input type="hidden" id="editManagerId">
+      <label>Name<input id="managerName"></label>
+      <label>Account<select id="managerAccount"></select></label>
+      <label>Monthly Target ($)<input id="managerTarget" type="number" step="0.01"></label>
+      <button class="btn primary" style="margin-top:14px" onclick="saveManager()">Save</button>
+    </div>
+  </div>
+
+  <div id="orderModal" class="modal">
+    <div class="modal-card">
+      <div class="panel-title">
+        <h3>Edit Order</h3><button class="btn" onclick="closeModal('orderModal')">×</button>
+      </div>
+      <input type="hidden" id="editOrderId">
+      <div class="form-grid" style="grid-template-columns:1fr 1fr">
+        <label>Amount<input id="editOrderAmount" type="number" step="0.01"></label>
+        <label>Status<select id="editOrderStatus">
+            <option>Completed</option>
+            <option>Pending</option>
+            <option>Cancelled</option>
+          </select></label>
+        <label style="grid-column:span 2">Notes<input id="editOrderNotes"></label>
+      </div>
+      <button class="btn primary" style="margin-top:14px" onclick="saveEditedOrder()">Save</button>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'trackingHubDataV3';
+
+    const demoData = {
+      settings: { realFee: 20, dummyPayout: 80, defaultDiscount: 10, pin: '1234' },
+      accounts: [
+        { id: 'a1', name: 'Nexency', active: true },
+        { id: 'a2', name: 'Design Minds', active: true },
+        { id: 'a3', name: 'Creative Hub', active: true }
+      ],
+      managers: [
+        { id: 'm1', name: 'Mahin', accountId: 'a1', target: 10000 },
+        { id: 'm2', name: 'Manager 2', accountId: 'a1', target: 8000 },
+        { id: 'm3', name: 'Manager 3', accountId: 'a2', target: 7000 }
+      ],
+      orders: [
+        { id: 'o1', date: '2026-10-24', accountId: 'a1', platform: 'Wix', type: 'real', amount: 400, serviceFee: 0, discount: 0, platformFee: 20, buyerPaid: 400, sellerReceives: 320, profitLoss: 320, managerId: 'm1', status: 'Completed', notes: '' },
+        { id: 'o2', date: '2026-10-23', accountId: 'a1', platform: 'Squarespace', type: 'real', amount: 100, serviceFee: 0, discount: 0, platformFee: 20, buyerPaid: 100, sellerReceives: 80, profitLoss: 80, managerId: 'm2', status: 'Completed', notes: '' },
+        { id: 'o3', date: '2026-10-21', accountId: 'a1', platform: 'Shopify', type: 'real', amount: 600, serviceFee: 0, discount: 0, platformFee: 20, buyerPaid: 600, sellerReceives: 480, profitLoss: 480, managerId: 'm1', status: 'Completed', notes: '' },
+        { id: 'o4', date: '2026-10-24', accountId: 'a1', platform: 'Shopify', type: 'dummy', amount: 80, serviceFee: 7, discount: 15, platformFee: 20, buyerPaid: 73.95, sellerReceives: 64, profitLoss: -9.95, managerId: '', status: 'Completed', notes: 'Private dummy order' }
+      ]
+    };
+
+    let db = loadData();
+    let currentAccountId = 'a1';
+    let platformChart, accountChart;
+
+    function clone(x) { return JSON.parse(JSON.stringify(x)); }
+    function loadData() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || clone(demoData); } catch (e) { return clone(demoData); } }
+    function persist() { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); }
+    function id(prefix) { return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+    function money(n) { return '$' + Number(n || 0).toFixed(2); }
+    function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 1800); }
+    function getAccount(id) { return db.accounts.find(x => x.id === id); }
+    function getManager(id) { return db.managers.find(x => x.id === id); }
+    function visibleOrders() { return db.orders.filter(o => o.status !== 'Cancelled'); }
+    function realOrders() { return visibleOrders().filter(o => o.type === 'real'); }
+    function dummyOrders() { return visibleOrders().filter(o => o.type === 'dummy'); }
+
+    function go(screen) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(screen).classList.add('active');
+      document.querySelectorAll('#sideNav a').forEach(a => a.classList.toggle('active', a.dataset.screen === screen));
+      if (screen === 'dashboard') renderDashboard();
+      if (screen === 'orders') renderOrders();
+      if (screen === 'accounts') renderAccounts();
+      if (screen === 'managers') renderManagers();
+      if (screen === 'private') renderPrivate();
+      if (screen === 'settings') renderSettings();
+      if (screen === 'addOrder') populateOrderForm();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    document.querySelectorAll('#sideNav a').forEach(a => a.addEventListener('click', () => go(a.dataset.screen)));
+
+    function populateSelects() {
+      const accountOpts = db.accounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+      document.getElementById('orderAccount').innerHTML = accountOpts;
+      document.getElementById('filterAccount').innerHTML = '<option value="">All Accounts</option>' + accountOpts;
+      document.getElementById('managerAccount').innerHTML = accountOpts;
+      const managerOpts = '<option value="">Unassigned</option>' + db.managers.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+      document.getElementById('orderManager').innerHTML = managerOpts;
+    }
+
+    function calcOrder(type, amount, serviceFee, discount, platformFee) {
+      amount = +amount || 0; serviceFee = +serviceFee || 0; discount = +discount || 0; platformFee = +platformFee || 0;
+      if (type === 'real') {
+        const buyerPaid = amount + serviceFee;
+        const fee = amount * (platformFee / 100);
+        const sellerReceives = amount - fee;
+        return { buyerPaid, fee, sellerReceives, profitLoss: sellerReceives };
+      }
+      const buyerPaid = (amount + serviceFee) * (1 - discount / 100);
+      const sellerReceives = amount * (db.settings.dummyPayout / 100);
+      const loss = Math.max(0, buyerPaid - sellerReceives);
+      return { buyerPaid, fee: 0, sellerReceives, profitLoss: -loss };
+    }
+
+    function populateOrderForm() {
+      populateSelects();
+      document.getElementById('orderPlatformFee').value = db.settings.realFee;
+      document.getElementById('orderDiscount').value = 0;
+      document.getElementById('orderDate').value = new Date().toISOString().slice(0, 10);
+      calculateOrderPreview();
+    }
+    function calculateOrderPreview() {
+      const r = calcOrder(orderType.value, orderAmount.value, orderService.value, orderDiscount.value, orderPlatformFee.value);
+      buyerPaid.textContent = money(r.buyerPaid);
+      if (orderType.value === 'dummy') {
+        feeOut.textContent = 'Private'; sellerReceives.textContent = 'Private'; profitLoss.textContent = 'Private';
+      } else {
+        feeOut.textContent = money(r.fee); sellerReceives.textContent = money(r.sellerReceives); profitLoss.textContent = money(r.profitLoss);
+      }
+    }
+    function saveOrder() {
+      const type = orderType.value, amount = +orderAmount.value || 0, serviceFee = +orderService.value || 0, discount = +orderDiscount.value || 0, platformFee = +orderPlatformFee.value || 0;
+      if (!amount) { toast('Enter an order amount'); return; }
+      const r = calcOrder(type, amount, serviceFee, discount, platformFee);
+      db.orders.push({ id: id('o'), date: orderDate.value, accountId: orderAccount.value, platform: orderPlatform.value, type, amount, serviceFee, discount, platformFee, buyerPaid: r.buyerPaid, sellerReceives: r.sellerReceives, profitLoss: r.profitLoss, managerId: orderManager.value, status: orderStatus.value, notes: orderNotes.value });
+      persist(); toast('Order saved'); orderNotes.value = ''; go('orders');
+    }
+
+    function totalsForAccount(accountId) {
+      const ros = realOrders().filter(o => o.accountId === accountId);
+      const dos = dummyOrders().filter(o => o.accountId === accountId);
+      return {
+        realCount: ros.length, dummyCount: dos.length,
+        sales: ros.reduce((s, o) => s + o.amount, 0),
+        net: ros.reduce((s, o) => s + o.sellerReceives, 0),
+        loss: dos.reduce((s, o) => s + Math.abs(o.profitLoss), 0),
+        invest: dos.reduce((s, o) => s + o.buyerPaid, 0)
+      };
+    }
+
+    function renderDashboard() {
+      const ros = realOrders(), dos = dummyOrders();
+      const totalSales = ros.reduce((s, o) => s + o.amount, 0), net = ros.reduce((s, o) => s + o.sellerReceives, 0);
+      dashboardKpis.innerHTML = `
+    <div class="card"><div class="kpi-label">Total Sales (Real)</div><div class="kpi-value">${money(totalSales)}</div><div class="kpi-sub green">${ros.length} real orders</div></div>
+    <div class="card"><div class="kpi-label">Net Revenue</div><div class="kpi-value">${money(net)}</div><div class="kpi-sub">After platform fees</div></div>
+    <div class="card"><div class="kpi-label">Total Orders</div><div class="kpi-value">${ros.length + dos.length}</div><div class="kpi-sub">Across all accounts</div></div>
+    <div class="card"><div class="kpi-label">Private Metrics</div><div class="kpi-value hidden-metric">••••••</div><div class="kpi-sub">Admin only</div></div>`;
+      dashAccountRows.innerHTML = db.accounts.map(a => { const t = totalsForAccount(a.id); return `<tr><td><b>${a.name}</b></td><td>${t.realCount}</td><td>${money(t.sales)}</td><td class="green">${money(t.net)}</td><td><button class="btn" onclick="openAccount('${a.id}')">View</button></td></tr>`; }).join('');
+
+      const platformMap = {}; ros.forEach(o => platformMap[o.platform] = (platformMap[o.platform] || 0) + o.amount);
+      if (platformChart) platformChart.destroy();
+      platformChart = new Chart(document.getElementById('platformChart'), { type: 'doughnut', data: { labels: Object.keys(platformMap), datasets: [{ data: Object.values(platformMap), backgroundColor: ['#3d8bfd', '#22b573', '#8b6cff', '#f7b73b', '#ff7a90'], borderWidth: 0 }] }, options: { plugins: { legend: { position: 'bottom' } }, cutout: '66%', maintainAspectRatio: false } });
+      const acctLabels = [], acctData = []; db.accounts.forEach(a => { acctLabels.push(a.name); acctData.push(totalsForAccount(a.id).sales); });
+      if (accountChart) accountChart.destroy();
+      accountChart = new Chart(document.getElementById('accountChart'), { type: 'bar', data: { labels: acctLabels, datasets: [{ data: acctData, backgroundColor: '#6d4aff' }] }, options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } }, maintainAspectRatio: false } });
+    }
+
+    function renderOrders() {
+      populateSelects();
+      const af = filterAccount.value, pf = filterPlatform.value, tf = filterType.value, q = filterSearch.value.toLowerCase();
+      const rows = db.orders.filter(o => (!af || o.accountId === af) && (!pf || o.platform === pf) && (!tf || o.type === tf) && (!q || (getAccount(o.accountId)?.name || '').toLowerCase().includes(q) || (o.notes || '').toLowerCase().includes(q))).sort((a, b) => b.date.localeCompare(a.date));
+      ordersRows.innerHTML = rows.map(o => `<tr>
+    <td>${o.date}</td><td>${getAccount(o.accountId)?.name || '-'}</td><td>${o.platform}</td>
+    <td><span class="tag ${o.type}">${o.type === 'real' ? 'Real' : 'Dummy'}</span></td>
+    <td>${money(o.amount)}</td><td>${money(o.buyerPaid)}</td><td>${o.type === 'dummy' ? 'Private' : money(o.sellerReceives)}</td>
+    <td>${getManager(o.managerId)?.name || '-'}</td><td><span class="tag active">${o.status}</span></td>
+    <td class="row-actions"><button class="btn" onclick="editOrder('${o.id}')">Edit</button><button class="btn red" onclick="deleteOrder('${o.id}')">Delete</button></td>
+  </tr>`).join('');
+    }
+    function editOrder(orderId) { const o = db.orders.find(x => x.id === orderId); editOrderId.value = o.id; editOrderAmount.value = o.amount; editOrderStatus.value = o.status; editOrderNotes.value = o.notes || ''; openModal('orderModal'); }
+    function saveEditedOrder() { const o = db.orders.find(x => x.id === editOrderId.value); o.amount = +editOrderAmount.value || 0; o.status = editOrderStatus.value; o.notes = editOrderNotes.value; const r = calcOrder(o.type, o.amount, o.serviceFee, o.discount, o.platformFee); Object.assign(o, { buyerPaid: r.buyerPaid, sellerReceives: r.sellerReceives, profitLoss: r.profitLoss }); persist(); closeModal('orderModal'); renderOrders(); toast('Order updated'); }
+    function deleteOrder(orderId) { if (confirm('Delete this order?')) { db.orders = db.orders.filter(o => o.id !== orderId); persist(); renderOrders(); toast('Order deleted'); } }
+
+    function accountPlatformSummary() {
+      const platforms = ['WordPress', 'Squarespace', 'Wix', 'Shopify', 'Webflow'];
+      const rows = [];
+      db.accounts.forEach(a => {
+        platforms.forEach(platform => {
+          const orders = visibleOrders().filter(o => o.accountId === a.id && o.platform === platform);
+          const real = orders.filter(o => o.type === 'real');
+          const dummy = orders.filter(o => o.type === 'dummy');
+          if (!orders.length) return;
+          rows.push({ account: a, platform, realCount: real.length, dummyCount: dummy.length, totalCount: orders.length, sales: real.reduce((s, o) => s + o.amount, 0), net: real.reduce((s, o) => s + o.sellerReceives, 0) });
+        });
+      });
+      return rows;
+    }
+    function renderAccounts() {
+      accountPlatformRows.innerHTML = accountPlatformSummary().map(r => `<tr><td><b>${r.account.name}</b></td><td>${r.platform}</td><td>${r.realCount}</td><td>${r.dummyCount}</td><td><b>${r.totalCount}</b></td><td>${money(r.sales)}</td><td class="green">${money(r.net)}</td><td><button class="btn" onclick="openAccount('${r.account.id}')">View Account</button></td></tr>`).join('') || `<tr><td colspan="8" class="muted">No account/platform order data yet.</td></tr>`;
+      accountCards.innerHTML = db.accounts.map(a => { const t = totalsForAccount(a.id); const total = visibleOrders().filter(o => o.accountId === a.id).length; const dummy = visibleOrders().filter(o => o.accountId === a.id && o.type === 'dummy').length; return `<div class="card"><h3>${a.name}</h3><p class="muted">${a.active ? 'Active' : 'Inactive'} • ${total} total orders</p><div class="statline"><span>Real Orders</span><b>${t.realCount}</b></div><div class="statline"><span>Dummy Orders</span><b>${dummy}</b></div><div class="statline"><span>Real Sales</span><b>${money(t.sales)}</b></div><div class="statline"><span>Net Revenue</span><b class="green">${money(t.net)}</b></div><div class="row-actions" style="margin-top:12px"><button class="btn primary" onclick="openAccount('${a.id}')">View</button><button class="btn" onclick="openAccountModal('${a.id}')">Edit</button><button class="btn red" onclick="deleteAccount('${a.id}')">Delete</button></div></div>`; }).join('');
+    }
+    function openAccount(accountId) { currentAccountId = accountId; renderAccountDetails(); go('accountDetails'); }
+    function renderAccountDetails() {
+      const a = getAccount(currentAccountId), t = totalsForAccount(currentAccountId), orders = db.orders.filter(o => o.accountId === currentAccountId);
+      accountTitle.textContent = a?.name || 'Account';
+      accOverview.innerHTML = `<div class="grid kpis"><div class="card"><div class="kpi-label">Real Sales</div><div class="kpi-value">${money(t.sales)}</div></div><div class="card"><div class="kpi-label">Net Revenue</div><div class="kpi-value">${money(t.net)}</div></div><div class="card"><div class="kpi-label">Real Orders</div><div class="kpi-value">${t.realCount}</div></div><div class="card"><div class="kpi-label">Private Metrics</div><div class="kpi-value">••••••</div></div></div>`;
+      accOrders.innerHTML = `<div class="card"><h3>Orders</h3><div class="table-wrap"><table><thead><tr><th>Date</th><th>Platform</th><th>Type</th><th>Amount</th><th>Status</th></tr></thead><tbody>${orders.map(o => `<tr><td>${o.date}</td><td>${o.platform}</td><td>${o.type}</td><td>${money(o.amount)}</td><td>${o.status}</td></tr>`).join('')}</tbody></table></div></div>`;
+      const platforms = {}; orders.forEach(o => { platforms[o.platform] = platforms[o.platform] || { real: 0, dummy: 0, sales: 0, net: 0 }; if (o.type === 'real') { platforms[o.platform].real++; platforms[o.platform].sales += o.amount; platforms[o.platform].net += o.sellerReceives; } else platforms[o.platform].dummy++; });
+      accPlatforms.innerHTML = `<div class="card"><div class="panel-title"><div><h3>Platform Breakdown</h3><p class="muted" style="margin:4px 0 0">Order counts are visible; dummy loss remains private.</p></div></div><div class="table-wrap"><table><thead><tr><th>Platform</th><th>Real Orders</th><th>Dummy Orders</th><th>Total Orders</th><th>Real Sales</th><th>Net Revenue</th></tr></thead><tbody>${Object.entries(platforms).map(([p, v]) => `<tr><td><b>${p}</b></td><td>${v.real}</td><td>${v.dummy}</td><td><b>${v.real + v.dummy}</b></td><td>${money(v.sales)}</td><td class="green">${money(v.net)}</td></tr>`).join('')}</tbody></table></div></div>`;
+    }
+    function subtab(id, btn) { document.querySelectorAll('#accountDetails .subscreen').forEach(x => x.classList.remove('active')); document.getElementById(id).classList.add('active'); document.querySelectorAll('#accountDetails .tab').forEach(x => x.classList.remove('active')); btn.classList.add('active'); }
+
+    function openAccountModal(accountId = '') { editAccountId.value = accountId; accountModalTitle.textContent = accountId ? 'Edit Account' : 'Add Account'; const a = getAccount(accountId); accountName.value = a?.name || ''; accountActive.value = String(a?.active ?? true); openModal('accountModal'); }
+    function saveAccount() { const name = accountName.value.trim(); if (!name) { toast('Enter account name'); return; } if (editAccountId.value) { const a = getAccount(editAccountId.value); a.name = name; a.active = accountActive.value === 'true'; } else db.accounts.push({ id: id('a'), name, active: accountActive.value === 'true' }); persist(); populateSelects(); closeModal('accountModal'); renderAccounts(); toast('Account saved'); }
+    function deleteAccount(accountId) { if (db.orders.some(o => o.accountId === accountId)) { alert('Delete/move this account’s orders first.'); return; } if (confirm('Delete account?')) { db.accounts = db.accounts.filter(a => a.id !== accountId); persist(); renderAccounts(); toast('Account deleted'); } }
+
+    function managerSales(managerId) { return realOrders().filter(o => o.managerId === managerId).reduce((s, o) => s + o.amount, 0); }
+    function renderManagers() { managerCards.innerHTML = db.managers.map(m => { const sales = managerSales(m.id), pct = m.target ? Math.min(100, sales / m.target * 100) : 0; return `<div class="card"><h3>${m.name}</h3><p class="muted">${getAccount(m.accountId)?.name || '-'}</p><div class="statline"><span>Sales</span><b>${money(sales)}</b></div><div class="statline"><span>Target</span><b>${money(m.target)}</b></div><div class="progress" style="margin-top:10px"><span style="width:${pct}%"></span></div><div class="row-actions" style="margin-top:12px"><button class="btn" onclick="openManagerModal('${m.id}')">Edit</button><button class="btn red" onclick="deleteManager('${m.id}')">Delete</button></div></div>`; }).join(''); }
+    function openManagerModal(managerId = '') { populateSelects(); editManagerId.value = managerId; managerModalTitle.textContent = managerId ? 'Edit Manager' : 'Add Manager'; const m = getManager(managerId); managerName.value = m?.name || ''; managerAccount.value = m?.accountId || db.accounts[0]?.id || ''; managerTarget.value = m?.target || 0; openModal('managerModal'); }
+    function saveManager() { const name = managerName.value.trim(); if (!name) { toast('Enter manager name'); return; } if (editManagerId.value) { const m = getManager(editManagerId.value); m.name = name; m.accountId = managerAccount.value; m.target = +managerTarget.value || 0; } else db.managers.push({ id: id('m'), name, accountId: managerAccount.value, target: +managerTarget.value || 0 }); persist(); populateSelects(); closeModal('managerModal'); renderManagers(); toast('Manager saved'); }
+    function deleteManager(managerId) { if (confirm('Delete manager? Orders will become unassigned.')) { db.orders.forEach(o => { if (o.managerId === managerId) o.managerId = ''; }); db.managers = db.managers.filter(m => m.id !== managerId); persist(); renderManagers(); toast('Manager deleted'); } }
+
+    function renderPrivate() {
+      if (privateContent.style.display === 'block') refreshPrivate();
+    }
+    function unlockFinance() { if (pinInput.value === db.settings.pin) { lockScreen.style.display = 'none'; privateContent.style.display = 'block'; refreshPrivate(); pinInput.value = ''; } else alert('Incorrect PIN'); }
+    function lockFinance() { privateContent.style.display = 'none'; lockScreen.style.display = 'block'; }
+    function refreshPrivate() {
+      const dos = dummyOrders(), loss = dos.reduce((s, o) => s + Math.abs(o.profitLoss), 0), invest = dos.reduce((s, o) => s + o.buyerPaid, 0);
+      privateKpis.innerHTML = `<div class="card"><div class="kpi-label">Dummy Orders</div><div class="kpi-value redtxt">${dos.length}</div></div><div class="card"><div class="kpi-label">Dummy Loss</div><div class="kpi-value redtxt">${money(loss)}</div></div><div class="card"><div class="kpi-label">Dummy Investment</div><div class="kpi-value">${money(invest)}</div></div><div class="card"><div class="kpi-label">Average Loss</div><div class="kpi-value">${money(dos.length ? loss / dos.length : 0)}</div></div>`;
+      const p = {}; dos.forEach(o => { p[o.platform] = p[o.platform] || { count: 0, invest: 0, loss: 0 }; p[o.platform].count++; p[o.platform].invest += o.buyerPaid; p[o.platform].loss += Math.abs(o.profitLoss); });
+      privatePlatformRows.innerHTML = Object.entries(p).map(([k, v]) => `<tr><td>${k}</td><td>${v.count}</td><td>${money(v.invest)}</td><td class="redtxt">${money(v.loss)}</td></tr>`).join('');
+      dummyRows.innerHTML = dos.map(o => `<tr><td>${o.date}</td><td>${getAccount(o.accountId)?.name || '-'}</td><td>${o.platform}</td><td>${money(o.amount)}</td><td>${money(o.buyerPaid)}</td><td>${money(o.sellerReceives)}</td><td class="redtxt">${money(Math.abs(o.profitLoss))}</td></tr>`).join('');
+    }
+
+    function renderSettings() { settingRealFee.value = db.settings.realFee; settingDummyPayout.value = db.settings.dummyPayout; settingDiscount.value = db.settings.defaultDiscount; settingPin.value = ''; }
+    function saveSettings() { db.settings.realFee = +settingRealFee.value || 20; db.settings.dummyPayout = +settingDummyPayout.value || 80; db.settings.defaultDiscount = +settingDiscount.value || 0; persist(); toast('Settings saved'); }
+    function savePin() { if (settingPin.value.length < 4) { toast('Use at least 4 digits/characters'); return; } db.settings.pin = settingPin.value; settingPin.value = ''; persist(); toast('PIN updated'); }
+
+    function generateReport(type) {
+      if (type === 'company') {
+        const ros = realOrders(); reportOutput.innerHTML = `<h3>Company Summary</h3><p>Total Real Sales: <b>${money(ros.reduce((s, o) => s + o.amount, 0))}</b></p><p>Net Revenue: <b>${money(ros.reduce((s, o) => s + o.sellerReceives, 0))}</b></p><p>Real Orders: <b>${ros.length}</b></p>`;
+      } else if (type === 'account') {
+        reportOutput.innerHTML = `<h3>Account Report</h3>${db.accounts.map(a => { const t = totalsForAccount(a.id); return `<div class="statline"><span>${a.name}</span><b>${money(t.sales)} / ${money(t.net)}</b></div>`; }).join('')}`;
+      } else {
+        reportOutput.innerHTML = `<h3>Manager Report</h3>${db.managers.map(m => `<div class="statline"><span>${m.name}</span><b>${money(managerSales(m.id))} / ${money(m.target)}</b></div>`).join('')}`;
+      }
+    }
+
+    function exportCSV() {
+      const header = ['Date', 'Account', 'Platform', 'Type', 'Order Amount', 'Buyer Paid', 'Seller Receives', 'Profit/Loss', 'Manager', 'Status'];
+      const rows = db.orders.map(o => [o.date, getAccount(o.accountId)?.name || '', o.platform, o.type, o.amount, o.buyerPaid, o.type === 'dummy' ? 'PRIVATE' : o.sellerReceives, o.type === 'dummy' ? 'PRIVATE' : o.profitLoss, getManager(o.managerId)?.name || '', o.status]);
+      const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replaceAll('"', '""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'tracking-hub-orders.csv'; a.click(); URL.revokeObjectURL(a.href);
+    }
+    function downloadBackup() { const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'tracking-hub-backup.json'; a.click(); URL.revokeObjectURL(a.href); }
+    function restoreBackup(e) { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { try { db = JSON.parse(r.result); persist(); init(); toast('Backup restored'); } catch (err) { alert('Invalid backup file'); } }; r.readAsText(f); }
+    function resetDemo() { if (confirm('Reset all local data to demo data?')) { db = clone(demoData); persist(); init(); toast('Demo data restored'); } }
+
+    function openModal(id) { document.getElementById(id).classList.add('show'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+    function init() {
+      populateSelects();
+      renderDashboard(); renderOrders(); renderAccounts(); renderManagers(); renderSettings();
+      orderDate.value = new Date().toISOString().slice(0, 10);
+      orderPlatformFee.value = db.settings.realFee;
+      calculateOrderPreview();
+    }
+    init();
+  </script>
+</body>
+
+</html>
