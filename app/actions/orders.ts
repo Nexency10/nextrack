@@ -58,7 +58,7 @@ export async function createOrder(_previousState: ActionState, formData: FormDat
   const notes = String(formData.get("notes") ?? "").trim();
 
   if (orderType !== "real" && orderType !== "dummy") return { error: "Choose a valid order type." };
-  if (orderType === "dummy" && profile.role !== "admin") return { error: "Only administrators can create dummy orders." };
+  if (orderType === "dummy" && profile.role !== "admin" && profile.role !== "manager") return { error: "Dummy-order permission is required." };
   if (!accountId) return { error: "Choose an account." };
   if (!(PLATFORMS as readonly string[]).includes(platform)) return { error: "Choose a valid platform." };
   if (!(STATUSES as readonly string[]).includes(status)) return { error: "Choose a valid order status." };
@@ -83,6 +83,14 @@ export async function createOrder(_previousState: ActionState, formData: FormDat
       return { error: "You can only create orders for your active assigned account." };
     }
     managerId = assignedManager.id;
+    if (orderType === "dummy") {
+      const { data: permission, error: permissionError } = await supabase
+        .from("dummy_order_manager_permissions")
+        .select("manager_id")
+        .eq("manager_id", assignedManager.id)
+        .maybeSingle();
+      if (permissionError || !permission) return { error: "An administrator must allow your account to create dummy orders." };
+    }
   }
 
   const { data: account, error: accountError } = await supabase
@@ -135,6 +143,8 @@ export async function createOrder(_previousState: ActionState, formData: FormDat
   revalidatePath("/dashboard");
   revalidatePath("/orders");
   revalidatePath("/orders/new");
+  revalidatePath("/reports");
+  revalidatePath("/private-finance");
   redirect("/orders");
 }
 
@@ -158,6 +168,8 @@ export async function updateOrder(_previousState: ActionState, formData: FormDat
 
   revalidatePath("/orders");
   revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  revalidatePath("/private-finance");
   return { success: "Order updated. Its totals have been recalculated." };
 }
 
@@ -172,6 +184,8 @@ export async function deleteOrder(formData: FormData) {
   const { data, error } = await query.select("id").maybeSingle();
   revalidatePath("/orders");
   revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  revalidatePath("/private-finance");
   if (error || !data) redirect("/orders?error=delete-failed");
   redirect("/orders?deleted=1");
 }

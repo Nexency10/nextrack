@@ -51,7 +51,7 @@ async function DashboardContent() {
             <MetricCard label="Total sales" value={money.format(Number(metrics.totalSales))} detail={`${metrics.realOrderCount} real orders`} icon={<BadgeDollarSign size={18} />} tone="violet" />
             <MetricCard label="Net revenue" value={money.format(Number(metrics.netRevenue))} detail="After platform fees" icon={<ChartNoAxesCombined size={18} />} tone="green" />
             <MetricCard label="Total orders" value={Number(metrics.totalOrderCount).toLocaleString()} detail="Real and dummy · excludes cancelled" icon={<Activity size={18} />} tone="blue" />
-            <MetricCard label="Private metrics" value="••••••" detail="Available in Private Finance" icon={<LockKeyhole size={17} />} tone="amber" privateMetric />
+            <MetricCard label={profile.role === "admin" ? "Dummy loss" : "Private metrics"} value={profile.role === "admin" && metrics.privateMetrics ? money.format(Number(metrics.privateMetrics.loss)) : "••••••"} detail={profile.role === "admin" && metrics.privateMetrics ? `${Number(metrics.privateMetrics.dummyOrderCount).toLocaleString()} dummy orders · view finance` : "Available in Private Finance"} icon={<LockKeyhole size={17} />} tone="amber" privateMetric href={profile.role === "admin" ? "/private-finance" : undefined} />
           </section>
 
           <SalesCharts platforms={salesByPlatform} accounts={salesByAccount} />
@@ -66,9 +66,10 @@ async function DashboardContent() {
   </div>;
 }
 
-function MetricCard({ label, value, detail, icon, tone, privateMetric = false }: { label: string; value: string; detail: string; icon: ReactNode; tone: "violet" | "green" | "blue" | "amber"; privateMetric?: boolean }) {
+function MetricCard({ label, value, detail, icon, tone, privateMetric = false, href }: { label: string; value: string; detail: string; icon: ReactNode; tone: "violet" | "green" | "blue" | "amber"; privateMetric?: boolean; href?: string }) {
   const tones = { violet: "bg-violet-50 text-[#7057ed]", green: "bg-emerald-50 text-[#1d9b70]", blue: "bg-sky-50 text-[#438ce5]", amber: "bg-amber-50 text-[#d39135]" };
-  return <article className="rounded-[18px] border border-[#e9ebf2] bg-white p-5 shadow-[0_8px_28px_rgba(35,39,76,.035)]"><div className="flex items-center justify-between"><p className="text-[11px] font-medium text-[#777c90]">{label}</p><span className={`grid h-9 w-9 place-items-center rounded-[12px] ${tones[tone]}`}>{icon}</span></div><p className={`mt-5 text-[25px] font-semibold leading-none tracking-[-.05em] ${privateMetric ? "text-[#a4a6b3]" : "text-[#25283a]"}`}>{value}</p><p className="mt-3 text-[10px] text-[#9699a9]">{detail}</p></article>;
+  const card = <article className={`rounded-[18px] border border-[#e9ebf2] bg-white p-5 shadow-[0_8px_28px_rgba(35,39,77,.035)] ${href ? "transition hover:border-[#d4cef9] hover:shadow-[0_12px_32px_rgba(112,87,237,.09)]" : ""}`}><div className="flex items-center justify-between"><p className="text-[11px] font-medium text-[#777c90]">{label}</p><span className={`grid h-9 w-9 place-items-center rounded-[12px] ${tones[tone]}`}>{icon}</span></div><p className={`mt-5 text-[25px] font-semibold leading-none tracking-[-.05em] ${privateMetric && !href ? "text-[#a4a6b3]" : "text-[#25283a]"}`}>{value}</p><p className="mt-3 text-[10px] text-[#9699a9]">{detail}</p></article>;
+  return href ? <Link href={href} className="block rounded-[18px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7057ed]">{card}</Link> : card;
 }
 
 function AccountNotice({ email, pending = false, banned = false, detail }: { email: string; pending?: boolean; banned?: boolean; detail?: string }) {

@@ -14,7 +14,7 @@ async function getAccountManager() {
   if (error || profile?.status !== "active" || !["admin", "manager"].includes(profile.role)) {
     return { error: "Active administrator or sales manager access is required." as const };
   }
-  return { supabase };
+  return { supabase, role: profile.role };
 }
 
 export async function saveAccount(_previousState: AccountActionState, formData: FormData): Promise<AccountActionState> {
@@ -43,12 +43,15 @@ export async function saveAccount(_previousState: AccountActionState, formData: 
   revalidatePath("/accounts");
   revalidatePath("/orders/new");
   revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  revalidatePath("/private-finance");
   return { success: `“${name}” was saved.` };
 }
 
 export async function deleteAccount(_previousState: AccountActionState, formData: FormData): Promise<AccountActionState> {
   const access = await getAccountManager();
   if ("error" in access) return { error: access.error };
+  if (access.role !== "admin") return { error: "Only administrators can delete accounts." };
 
   const accountId = String(formData.get("accountId") ?? "").trim();
   if (!accountId) return { error: "Choose an account to delete." };
@@ -65,5 +68,7 @@ export async function deleteAccount(_previousState: AccountActionState, formData
   revalidatePath("/accounts");
   revalidatePath("/orders/new");
   revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  revalidatePath("/private-finance");
   return { success: "Account deleted." };
 }

@@ -71,6 +71,7 @@ export async function banUser(_previousState: UserActionState, formData: FormDat
   revalidatePath("/admin/users");
   revalidatePath("/dashboard");
   revalidatePath("/sales-managers");
+  revalidatePath("/reports");
   return { success: "The user is banned from Supabase Auth and workspace data." };
 }
 
@@ -102,6 +103,7 @@ export async function restoreUser(_previousState: UserActionState, formData: For
   revalidatePath("/admin/users");
   revalidatePath("/dashboard");
   revalidatePath("/sales-managers");
+  revalidatePath("/reports");
   return { success: "The user can sign in and access the workspace again." };
 }
 

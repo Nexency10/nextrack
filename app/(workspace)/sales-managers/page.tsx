@@ -21,15 +21,18 @@ async function SalesManagersContent() {
   const { data: profile } = await supabase.from("profiles").select("role, status").eq("id", user.id).maybeSingle();
   if (profile?.status !== "active") redirect("/dashboard");
 
-  const [managersResult, accountsResult, ordersResult, membersResult] = await Promise.all([
+  const [managersResult, accountsResult, ordersResult, membersResult, permissionsResult] = await Promise.all([
     supabase.from("sales_managers").select("id, name, account_id, target, active, profile_id").order("name"),
     supabase.from("accounts").select("id, name, active").order("name"),
     supabase.from("orders").select("manager_id, order_type, amount, status").eq("order_type", "real").neq("status", "Cancelled"),
     profile.role === "admin"
       ? supabase.from("profiles").select("id, full_name, email, role, status").eq("status", "active").eq("role", "viewer").order("full_name")
       : Promise.resolve({ data: [] as MemberRow[], error: null }),
+    profile.role === "admin"
+      ? supabase.from("dummy_order_manager_permissions").select("manager_id")
+      : Promise.resolve({ data: [] as { manager_id: string }[], error: null }),
   ]);
-  const error = managersResult.error ?? accountsResult.error ?? ordersResult.error ?? membersResult.error;
+  const error = managersResult.error ?? accountsResult.error ?? ordersResult.error ?? membersResult.error ?? permissionsResult.error;
   if (error) return <ManagerDataError message={error.message} />;
 
   const accounts = new Map(((accountsResult.data ?? []) as AccountRow[]).map((account) => [account.id, account]));
@@ -56,8 +59,9 @@ async function SalesManagersContent() {
       active: manager.active,
       profileId: manager.profile_id,
       profileRole: manager.profile_id
-        ? (((membersResult.data ?? []) as MemberRow[]).find((member) => member.id === manager.profile_id)?.role as "viewer" | "manager" | undefined) ?? null
+        ? (((membersResult.data ?? []) as MemberRow[]).find((member) => member.id === manager.profile_id)?.role as "viewer" | undefined) ?? "manager"
         : null,
+      canCreateDummy: ((permissionsResult.data ?? []) as { manager_id: string }[]).some((permission) => permission.manager_id === manager.id),
     };
   });
 

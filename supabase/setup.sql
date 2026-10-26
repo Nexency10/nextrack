@@ -15,8 +15,36 @@ create table if not exists public.profiles (
 );
 
 alter table public.profiles alter column role set default 'viewer';
-alter table public.profiles drop constraint if exists profiles_role_check;
-update public.profiles set role = 'viewer' where role = 'staff';
+do $$
+declare
+  role_attnum smallint;
+  role_constraint record;
+begin
+  select attnum
+    into role_attnum
+    from pg_attribute
+   where attrelid = 'public.profiles'::regclass
+     and attname = 'role'
+     and not attisdropped;
+
+  for role_constraint in
+    select conname
+      from pg_constraint
+     where conrelid = 'public.profiles'::regclass
+       and contype = 'c'
+       and role_attnum = any (conkey)
+  loop
+    execute format(
+      'alter table public.profiles drop constraint %I',
+      role_constraint.conname
+    );
+  end loop;
+end;
+$$;
+update public.profiles
+set role = 'viewer'
+where role not in ('admin', 'manager', 'viewer');
+alter table public.profiles alter column role set not null;
 alter table public.profiles add constraint profiles_role_check
   check (role in ('admin', 'manager', 'viewer'));
 
@@ -186,6 +214,14 @@ alter table public.sales_managers
 create unique index if not exists sales_managers_profile_id_unique
   on public.sales_managers (profile_id);
 
+create table if not exists public.dummy_order_manager_permissions (
+  manager_id uuid primary key references public.sales_managers (id) on delete cascade,
+  granted_by uuid references auth.users (id) on delete set null default auth.uid(),
+  created_at timestamptz not null default now()
+);
+create index if not exists dummy_order_manager_permissions_granted_by_idx
+  on public.dummy_order_manager_permissions (granted_by);
+
 create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),
   order_date date not null default current_date,
@@ -262,6 +298,27 @@ as $$
 $$;
 revoke all on function private.can_manage_workspace() from public, anon;
 grant execute on function private.can_manage_workspace() to authenticated;
+
+create or replace function private.can_create_dummy_order()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.profiles p
+    where p.id = (select auth.uid()) and p.status = 'active' and p.role = 'admin'
+  ) or exists (
+    select 1
+    from public.profiles p
+    join public.sales_managers sm on sm.profile_id = p.id
+    join public.dummy_order_manager_permissions permission on permission.manager_id = sm.id
+    where p.id = (select auth.uid()) and p.status = 'active' and p.role = 'manager' and sm.active
+  );
+$$;
+revoke all on function private.can_create_dummy_order() from public, anon;
+grant execute on function private.can_create_dummy_order() to authenticated;
 
 create or replace function private.adjust_dashboard_order_count()
 returns trigger
@@ -344,11 +401,14 @@ create trigger calculate_order_totals
 alter table public.app_settings enable row level security;
 alter table public.accounts enable row level security;
 alter table public.sales_managers enable row level security;
+alter table public.dummy_order_manager_permissions enable row level security;
 alter table public.orders enable row level security;
 alter table public.dashboard_counts enable row level security;
 
 revoke all on public.app_settings, public.accounts, public.sales_managers, public.orders, public.dashboard_counts from anon, authenticated;
+revoke all on public.dummy_order_manager_permissions from anon, authenticated;
 grant select on public.app_settings, public.accounts, public.sales_managers, public.orders, public.dashboard_counts to authenticated;
+grant select, insert, update, delete on public.dummy_order_manager_permissions to authenticated;
 grant insert, update, delete on public.accounts, public.sales_managers to authenticated;
 grant insert, update, delete on public.orders to authenticated;
 grant update (real_fee_percent, dummy_payout_percent, default_discount_percent) on public.app_settings to authenticated;
@@ -377,9 +437,10 @@ create policy "Managers update accounts"
   using ((select private.can_manage_workspace()))
   with check ((select private.can_manage_workspace()));
 drop policy if exists "Managers delete accounts" on public.accounts;
-create policy "Managers delete accounts"
+drop policy if exists "Admins delete accounts" on public.accounts;
+create policy "Admins delete accounts"
   on public.accounts for delete to authenticated
-  using ((select private.can_manage_workspace()));
+  using ((select private.is_active_admin()));
 
 drop policy if exists "Active members read sales managers" on public.sales_managers;
 create policy "Active members read sales managers"
@@ -412,11 +473,12 @@ create policy "Members read real orders and admins read all"
     and (order_type = 'real' or (select private.is_active_admin()))
   );
 drop policy if exists "Managers create orders" on public.orders;
-create policy "Managers create orders"
+drop policy if exists "Authorized members create orders" on public.orders;
+create policy "Authorized members create orders"
   on public.orders for insert to authenticated
   with check (
     (select private.can_manage_workspace())
-    and (order_type = 'real' or (select private.is_active_admin()))
+    and (order_type = 'real' or (select private.can_create_dummy_order()))
     and (
       (select private.is_active_admin())
       or exists (
@@ -428,6 +490,41 @@ create policy "Managers create orders"
       )
     )
   );
+drop policy if exists "Admins and assigned managers read dummy permissions" on public.dummy_order_manager_permissions;
+create policy "Admins and assigned managers read dummy permissions"
+  on public.dummy_order_manager_permissions for select to authenticated
+  using (
+    (select private.is_active_admin())
+    or exists (
+      select 1 from public.sales_managers sm join public.profiles p on p.id = sm.profile_id
+      where sm.id = manager_id and p.id = (select auth.uid()) and p.role = 'manager' and p.status = 'active'
+    )
+  );
+drop policy if exists "Admins manage dummy permissions" on public.dummy_order_manager_permissions;
+create policy "Admins manage dummy permissions"
+  on public.dummy_order_manager_permissions for insert to authenticated
+  with check (
+    (select private.is_active_admin())
+    and exists (
+      select 1 from public.sales_managers sm join public.profiles p on p.id = sm.profile_id
+      where sm.id = manager_id and sm.active and p.role = 'manager' and p.status = 'active'
+    )
+  );
+drop policy if exists "Admins update dummy permissions" on public.dummy_order_manager_permissions;
+create policy "Admins update dummy permissions"
+  on public.dummy_order_manager_permissions for update to authenticated
+  using ((select private.is_active_admin()))
+  with check (
+    (select private.is_active_admin())
+    and exists (
+      select 1 from public.sales_managers sm join public.profiles p on p.id = sm.profile_id
+      where sm.id = manager_id and sm.active and p.role = 'manager' and p.status = 'active'
+    )
+  );
+drop policy if exists "Admins revoke dummy permissions" on public.dummy_order_manager_permissions;
+create policy "Admins revoke dummy permissions"
+  on public.dummy_order_manager_permissions for delete to authenticated
+  using ((select private.is_active_admin()));
 drop policy if exists "Managers update orders" on public.orders;
 create policy "Managers update orders"
   on public.orders for update to authenticated
@@ -522,5 +619,107 @@ revoke all on function public.get_dashboard_metrics() from public, anon;
 grant execute on function public.get_dashboard_metrics() to authenticated;
 
 -- Refresh the PostgREST schema cache after creating the tables.
+NOTIFY pgrst, 'reload schema';
+
+
+-- Source: supabase/migrations/20261026062620_admin_salary_management.sql
+-- Employee roster and monthly payroll snapshots. All salary and bank data is
+-- restricted to active administrators through both RLS and server actions.
+create table if not exists public.salary_employees (
+  id uuid primary key default gen_random_uuid(),
+  name text not null check (length(trim(name)) between 1 and 120),
+  designation text not null default '' check (length(designation) <= 120),
+  mobile text not null default '' check (length(mobile) <= 40),
+  current_salary numeric(12, 2) not null check (current_salary >= 0),
+  bank_name text not null default '' check (length(bank_name) <= 120),
+  bank_branch text not null default '' check (length(bank_branch) <= 120),
+  bank_account text not null default '' check (length(bank_account) <= 80),
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists salary_employees_active_name_idx
+  on public.salary_employees (name)
+  where active;
+
+create table if not exists public.salary_payroll (
+  id uuid primary key default gen_random_uuid(),
+  employee_id uuid not null references public.salary_employees (id) on delete restrict,
+  pay_period date not null check (extract(day from pay_period) = 1),
+  employee_name text not null,
+  designation text not null default '',
+  mobile text not null default '',
+  base_salary numeric(12, 2) not null check (base_salary >= 0),
+  leave_deduction numeric(12, 2) not null default 0
+    check (leave_deduction >= 0 and leave_deduction <= base_salary),
+  net_pay numeric(12, 2) generated always as (base_salary - leave_deduction) stored,
+  bank_name text not null default '',
+  bank_branch text not null default '',
+  bank_account text not null default '',
+  status text not null default 'pending' check (status in ('pending', 'paid')),
+  paid_at timestamptz,
+  created_at timestamptz not null default now(),
+  constraint salary_payroll_employee_period_unique unique (employee_id, pay_period),
+  constraint salary_payroll_payment_timestamp_check check (
+    (status = 'pending' and paid_at is null)
+    or (status = 'paid' and paid_at is not null)
+  )
+);
+
+create index if not exists salary_payroll_period_name_idx
+  on public.salary_payroll (pay_period desc, employee_name);
+
+alter table public.salary_employees enable row level security;
+alter table public.salary_payroll enable row level security;
+
+revoke all on public.salary_employees, public.salary_payroll from anon, authenticated;
+grant select, insert, update, delete on public.salary_employees, public.salary_payroll to authenticated;
+
+drop policy if exists "Active admins read salary employees" on public.salary_employees;
+create policy "Active admins read salary employees"
+  on public.salary_employees for select to authenticated
+  using ((select private.is_active_admin()));
+
+drop policy if exists "Active admins create salary employees" on public.salary_employees;
+create policy "Active admins create salary employees"
+  on public.salary_employees for insert to authenticated
+  with check ((select private.is_active_admin()));
+
+drop policy if exists "Active admins update salary employees" on public.salary_employees;
+create policy "Active admins update salary employees"
+  on public.salary_employees for update to authenticated
+  using ((select private.is_active_admin()))
+  with check ((select private.is_active_admin()));
+
+drop policy if exists "Active admins delete salary employees" on public.salary_employees;
+create policy "Active admins delete salary employees"
+  on public.salary_employees for delete to authenticated
+  using ((select private.is_active_admin()));
+
+drop policy if exists "Active admins read salary payroll" on public.salary_payroll;
+create policy "Active admins read salary payroll"
+  on public.salary_payroll for select to authenticated
+  using ((select private.is_active_admin()));
+
+drop policy if exists "Active admins create salary payroll" on public.salary_payroll;
+create policy "Active admins create salary payroll"
+  on public.salary_payroll for insert to authenticated
+  with check (
+    (select private.is_active_admin())
+    and status = 'pending'
+    and paid_at is null
+  );
+
+drop policy if exists "Active admins update pending salary payroll" on public.salary_payroll;
+create policy "Active admins update pending salary payroll"
+  on public.salary_payroll for update to authenticated
+  using ((select private.is_active_admin()) and status = 'pending')
+  with check ((select private.is_active_admin()));
+
+drop policy if exists "Active admins delete pending salary payroll" on public.salary_payroll;
+create policy "Active admins delete pending salary payroll"
+  on public.salary_payroll for delete to authenticated
+  using ((select private.is_active_admin()) and status = 'pending');
+
 NOTIFY pgrst, 'reload schema';
 

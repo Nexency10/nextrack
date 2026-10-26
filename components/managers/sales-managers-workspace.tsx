@@ -3,8 +3,8 @@
 import { useActionState, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowUpRight, BriefcaseBusiness, Building2, CirclePlus, Pencil, Search, Target, Trash2, TrendingUp, Users, X } from "lucide-react";
-import { assignWorkspaceRole, deleteSalesManager, saveSalesManager, type ManagerActionState } from "@/app/actions/managers";
+import { ArrowUpRight, BriefcaseBusiness, Building2, CirclePlus, KeyRound, Pencil, Search, Target, Trash2, TrendingUp, Users, X } from "lucide-react";
+import { assignWorkspaceRole, deleteSalesManager, saveSalesManager, setDummyOrderPermission, type ManagerActionState } from "@/app/actions/managers";
 
 export type SalesManagerItem = {
   id: string;
@@ -19,6 +19,7 @@ export type SalesManagerItem = {
   active: boolean;
   profileId: string | null;
   profileRole: "viewer" | "manager" | null;
+  canCreateDummy: boolean;
 };
 type AccountOption = { id: string; name: string; active: boolean };
 type MemberOption = { id: string; name: string; email: string; role: "viewer" | "manager" };
@@ -114,9 +115,29 @@ function ManagerCard({ manager, canManage, isAdmin, onEdit }: { manager: SalesMa
     <div className="mt-5 grid grid-cols-2 gap-3 rounded-[15px] bg-[#fafbfe] p-3.5"><div><p className="text-[9px] font-medium text-[#979bad]">Real sales</p><p className="mt-1 text-sm font-semibold text-[#35394c]">{manager.sales}</p></div><div><p className="text-[9px] font-medium text-[#979bad]">Monthly target</p><p className="mt-1 text-sm font-semibold text-[#35394c]">{money(targetCents)}</p></div></div>
     <div className="mt-4"><div className="mb-2 flex items-center justify-between text-[9px]"><span className="font-medium text-[#85899d]">Sales against target</span><span className="font-semibold text-[#6653d2]">{progress.toFixed(1)}%</span></div><div className="h-2 overflow-hidden rounded-full bg-[#eeedf5]"><div className="h-full rounded-full bg-gradient-to-r from-[#8d79f5] to-[#6e55e8] transition-[width]" style={{ width: `${progress}%` }} /></div><p className="mt-2 text-[9px] text-[#a0a3b1]">{manager.orderCount.toLocaleString()} assigned real {manager.orderCount === 1 ? "order" : "orders"}</p></div>
     {manager.profileId && <p className="mt-4 border-t border-[#eff0f5] pt-3 text-[10px] text-[#969aab]">{isAdmin && manager.profileRole ? <>Linked workspace role: <span className="font-semibold text-[#656a7d]">{manager.profileRole === "manager" ? "Sales manager" : "View only"}</span></> : "Linked to a workspace user."}</p>}
+    {isAdmin && manager.profileId && manager.profileRole === "manager" && <DummyPermissionToggle manager={manager} />}
     {canManage && isAdmin && manager.profileId && manager.profileRole && <div className="mt-4 border-t border-[#eff0f5] pt-4"><button type="button" onClick={onEdit} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#e7e8ef] px-3 text-[10px] font-semibold text-[#656a7d] transition hover:border-[#c9c2f7] hover:text-[#7057ed]"><Pencil size={12} /> Edit manager & role</button></div>}
     {canManage && !manager.profileId && <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[#eff0f5] pt-4"><button type="button" onClick={onEdit} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#e7e8ef] px-3 text-[10px] font-semibold text-[#656a7d] transition hover:border-[#c9c2f7] hover:text-[#7057ed]"><Pencil size={12} /> Edit</button><form action={action} onSubmit={(event) => { if (!window.confirm(`Delete ${manager.name}? Existing orders will become unassigned.`)) event.preventDefault(); }}><input type="hidden" name="managerId" value={manager.id} /><button disabled={pending} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#e7e8ef] px-3 text-[10px] font-semibold text-[#85899a] transition hover:border-rose-200 hover:text-rose-600 disabled:opacity-50"><Trash2 size={12} /> {pending ? "Deleting…" : "Delete"}</button></form>{state.error && <p role="alert" className="basis-full text-[10px] text-rose-700">{state.error}</p>}</div>}
   </article>;
+}
+
+function DummyPermissionToggle({ manager }: { manager: SalesManagerItem }) {
+  const router = useRouter();
+  const [state, action, pending] = useActionState(async (previous: ManagerActionState, formData: FormData) => {
+    const result = await setDummyOrderPermission(previous, formData);
+    if (result.success) router.refresh();
+    return result;
+  }, {});
+  return <form action={action} className="mt-4 border-t border-[#eff0f5] pt-4">
+    <input type="hidden" name="managerId" value={manager.id} />
+    <input type="hidden" name="enabled" value={String(!manager.canCreateDummy)} />
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-2"><span className={`grid h-8 w-8 place-items-center rounded-[11px] ${manager.canCreateDummy ? "bg-emerald-50 text-emerald-700" : "bg-[#f5f5f9] text-[#85899a]"}`}><KeyRound size={14} /></span><div><p className="text-[10px] font-semibold text-[#4d5266]">Dummy-order access</p><p className="mt-0.5 text-[9px] text-[#969aab]">{manager.canCreateDummy ? "This manager can create dummy orders" : "This manager can create real orders only"}</p></div></div>
+      <button type="submit" disabled={pending || (!manager.canCreateDummy && (!manager.active || !manager.accountActive))} className={`h-9 rounded-lg px-3 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${manager.canCreateDummy ? "border border-rose-200 text-rose-700 hover:bg-rose-50" : "bg-[#7057ed] text-white hover:bg-[#6249df]"}`}>{pending ? "Saving…" : manager.canCreateDummy ? "Revoke access" : "Allow dummy orders"}</button>
+    </div>
+    {state.error && <p role="alert" className="mt-2 text-[10px] text-rose-700">{state.error}</p>}
+    {state.success && <p role="status" className="mt-2 text-[10px] text-emerald-700">{state.success}</p>}
+  </form>;
 }
 
 function ManagerEditor({ manager, accounts, onClose }: { manager: SalesManagerItem | null; accounts: AccountOption[]; onClose: () => void }) {

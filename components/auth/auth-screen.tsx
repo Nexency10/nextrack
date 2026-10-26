@@ -13,12 +13,13 @@ import {
     TrendingUp,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 
 type Mode = "signin" | "signup";
 
 export function AuthScreen() {
     const router = useRouter();
+    const formRef = useRef<HTMLFormElement>(null);
     const [mode, setMode] = useState<Mode>("signin");
     const [showPassword, setShowPassword] = useState(false);
     const [busy, setBusy] = useState(false);
@@ -37,58 +38,45 @@ export function AuthScreen() {
             .toLowerCase();
         const password = String(data.get("password") ?? "");
 
-        if (mode === "signin") {
-            const result = await signInWithIdentifier(identifier, password);
-            if (result.error) {
-                setMessage({ text: result.error, error: true });
-                setBusy(false);
+        try {
+            if (mode === "signin") {
+                const result = await signInWithIdentifier(identifier, password);
+                if (result.error) {
+                    setMessage({ text: result.error, error: true });
+                    return;
+                }
+                router.replace("/dashboard");
+                router.refresh();
                 return;
             }
-            router.replace("/dashboard");
-            router.refresh();
-            return;
-        }
 
-        const supabase = createClient();
-        const fullName = String(data.get("name") ?? "").trim();
-        const username = String(data.get("username") ?? "")
-            .trim()
-            .toLowerCase();
-        const { data: result, error } = await supabase.auth.signUp({
-            email: identifier,
-            password,
-            options: {
-                data: { full_name: fullName, username },
-                emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
-            },
-        });
-        if (error) {
-            setMessage({ text: error.message, error: true });
-        } else if (result.session) {
-            router.replace("/dashboard");
-            router.refresh();
-            return;
-        } else {
-            setMessage({
-                text: "Check your email to confirm your account. Your access will be ready after confirmation.",
+            const supabase = createClient();
+            const fullName = String(data.get("name") ?? "").trim();
+            const username = String(data.get("username") ?? "")
+                .trim()
+                .toLowerCase();
+            const { data: result, error } = await supabase.auth.signUp({
+                email: identifier,
+                password,
+                options: {
+                    data: { full_name: fullName, username },
+                    emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+                },
             });
-            setMode("signin");
-        }
-        setBusy(false);
-    }
-
-    async function signInWithGoogle() {
-        setBusy(true);
-        setMessage(null);
-        const supabase = createClient();
-        const { error } = await supabase.auth.signInWithOAuth({
-            provider: "google",
-            options: {
-                redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
-            },
-        });
-        if (error) {
-            setMessage({ text: error.message, error: true });
+            if (error) {
+                setMessage({ text: error.message, error: true });
+            } else if (result.session) {
+                router.replace("/dashboard");
+                router.refresh();
+                return;
+            } else {
+                setMessage({
+                    text: "Check your email to confirm your account. Your access will be ready after confirmation.",
+                });
+                setMode("signin");
+            }
+        } finally {
+            formRef.current?.reset();
             setBusy(false);
         }
     }
@@ -193,21 +181,7 @@ export function AuthScreen() {
                             </p>
                         </div>
 
-                        <button
-                            type="button"
-                            disabled={busy}
-                            onClick={signInWithGoogle}
-                            className="flex h-13 w-full items-center justify-center gap-3 rounded-xl border border-[#e7e8ef] bg-white text-[13px] font-semibold transition hover:bg-[#f9f9fc] disabled:opacity-50"
-                        >
-                            <GoogleMark /> Continue with Google
-                        </button>
-                        <div className="my-7 flex items-center gap-4 text-[10px] font-semibold tracking-[.12em] text-[#a4a7b5] uppercase">
-                            <span className="h-px flex-1 bg-[#ececf2]" /> or
-                            with email{" "}
-                            <span className="h-px flex-1 bg-[#ececf2]" />
-                        </div>
-
-                        <form onSubmit={submit} className="space-y-4.25">
+                        <form ref={formRef} onSubmit={submit} className="space-y-4.25">
                             {signup && (
                                 <>
                                     <Field
@@ -326,6 +300,7 @@ export function AuthScreen() {
                             <button
                                 type="button"
                                 onClick={() => {
+                                    formRef.current?.reset();
                                     setMode(signup ? "signin" : "signup");
                                     setMessage(null);
                                 }}
@@ -389,25 +364,3 @@ function Field({
     );
 }
 
-function GoogleMark() {
-    return (
-        <svg aria-hidden="true" width="17" height="17" viewBox="0 0 48 48">
-            <path
-                fill="#EA4335"
-                d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z"
-            />
-            <path
-                fill="#4285F4"
-                d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.77 7.18l7.73 6C44.4 37.83 46.98 31.74 46.98 24.55Z"
-            />
-            <path
-                fill="#FBBC05"
-                d="M10.53 28.59a14.4 14.4 0 0 1 0-9.18l-7.98-6.19a23.95 23.95 0 0 0 0 21.56l7.98-6.19Z"
-            />
-            <path
-                fill="#34A853"
-                d="M24 48c6.48 0 11.93-2.13 15.9-5.8l-7.73-6c-2.15 1.45-4.9 2.3-8.17 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48Z"
-            />
-        </svg>
-    );
-}

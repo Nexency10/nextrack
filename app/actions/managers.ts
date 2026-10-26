@@ -46,6 +46,10 @@ export async function assignWorkspaceRole(_previousState: ManagerActionState, fo
       return { error: error.message };
     }
   } else {
+    const { data: linkedManager } = await supabase.from("sales_managers").select("id").eq("profile_id", profileId).maybeSingle();
+    if (linkedManager) {
+      await supabase.from("dummy_order_manager_permissions").delete().eq("manager_id", linkedManager.id);
+    }
     const { error } = await supabase.from("sales_managers").update({ active: false }).eq("profile_id", profileId);
     if (error) {
       await supabase.from("profiles").update({ role: member.role }).eq("id", profileId).neq("role", "admin");
@@ -55,7 +59,36 @@ export async function assignWorkspaceRole(_previousState: ManagerActionState, fo
 
   revalidateManagerViews();
   revalidatePath("/admin/users");
+  revalidatePath("/reports");
+  revalidatePath("/private-finance");
   return { success: role === "manager" ? "Role and sales manager target saved." : "User now has view-only access." };
+}
+
+export async function setDummyOrderPermission(_previousState: ManagerActionState, formData: FormData): Promise<ManagerActionState> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Sign in to continue." };
+  const { data: actor, error: actorError } = await supabase.from("profiles").select("role, status").eq("id", user.id).maybeSingle();
+  if (actorError || actor?.role !== "admin" || actor.status !== "active") return { error: "Active administrator access is required to manage dummy-order permissions." };
+
+  const managerId = String(formData.get("managerId") ?? "").trim();
+  const enabled = String(formData.get("enabled") ?? "") === "true";
+  if (!/^[0-9a-f-]{36}$/i.test(managerId)) return { error: "Choose a valid sales manager." };
+  const { data: manager, error: managerError } = await supabase.from("sales_managers").select("id, profile_id, active").eq("id", managerId).maybeSingle();
+  if (managerError || !manager?.profile_id || !manager.active) return { error: "Only an active, linked sales manager can be authorized." };
+  const { data: profile, error: profileError } = await supabase.from("profiles").select("role, status").eq("id", manager.profile_id).maybeSingle();
+  if (profileError || profile?.role !== "manager" || profile.status !== "active") return { error: "This manager does not have an active sales-manager role." };
+
+  if (enabled) {
+    const { error } = await supabase.from("dummy_order_manager_permissions").upsert({ manager_id: managerId, granted_by: user.id }, { onConflict: "manager_id" });
+    if (error) return { error: error.message };
+  } else {
+    const { error } = await supabase.from("dummy_order_manager_permissions").delete().eq("manager_id", managerId);
+    if (error) return { error: error.message };
+  }
+
+  revalidateManagerViews();
+  return { success: enabled ? "Dummy-order access granted." : "Dummy-order access removed." };
 }
 
 async function getManagerOperator() {
@@ -81,6 +114,8 @@ function revalidateManagerViews() {
   revalidatePath("/orders");
   revalidatePath("/orders/new");
   revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  revalidatePath("/private-finance");
 }
 
 export async function saveSalesManager(_previousState: ManagerActionState, formData: FormData): Promise<ManagerActionState> {

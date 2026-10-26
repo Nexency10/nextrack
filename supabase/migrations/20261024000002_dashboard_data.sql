@@ -220,9 +220,9 @@ create policy "Managers update accounts"
   using ((select private.can_manage_workspace()))
   with check ((select private.can_manage_workspace()));
 drop policy if exists "Managers delete accounts" on public.accounts;
-create policy "Managers delete accounts"
+create policy "Admins delete accounts"
   on public.accounts for delete to authenticated
-  using ((select private.can_manage_workspace()));
+  using ((select private.is_active_admin()));
 
 drop policy if exists "Active members read sales managers" on public.sales_managers;
 create policy "Active members read sales managers"

@@ -2,8 +2,37 @@
 -- Existing staff profiles represented the same unassigned/view-only state.
 
 alter table public.profiles alter column role set default 'viewer';
-alter table public.profiles drop constraint if exists profiles_role_check;
-update public.profiles set role = 'viewer' where role = 'staff';
+do $$
+declare
+  role_attnum smallint;
+  role_constraint record;
+begin
+  select attnum
+    into role_attnum
+    from pg_attribute
+   where attrelid = 'public.profiles'::regclass
+     and attname = 'role'
+     and not attisdropped;
+
+  for role_constraint in
+    select conname
+      from pg_constraint
+     where conrelid = 'public.profiles'::regclass
+       and contype = 'c'
+       and role_attnum = any (conkey)
+  loop
+    execute format(
+      'alter table public.profiles drop constraint %I',
+      role_constraint.conname
+    );
+  end loop;
+end;
+$$;
+
+update public.profiles
+set role = 'viewer'
+where role not in ('admin', 'manager', 'viewer');
+
 alter table public.profiles add constraint profiles_role_check
   check (role in ('admin', 'manager', 'viewer'));
 

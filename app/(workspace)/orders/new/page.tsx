@@ -28,6 +28,9 @@ async function NewOrderContent({ searchParams }: { searchParams: Promise<{ accou
   const fixedManager = profile.role === "manager"
     ? (managersResult.data ?? []).find((manager) => manager.profile_id === user.id) ?? null
     : null;
+  const managerPermissionResult = profile.role === "manager" && fixedManager
+    ? await supabase.from("dummy_order_manager_permissions").select("manager_id").eq("manager_id", fixedManager.id).maybeSingle()
+    : null;
   if (profile.role === "manager" && !fixedManager) {
     return <div className="mx-auto max-w-3xl px-5 py-12 sm:px-8"><section className="rounded-[20px] border border-amber-200 bg-amber-50 p-6"><h1 className="text-base font-semibold text-amber-950">Sales manager assignment unavailable</h1><p className="mt-2 text-sm leading-6 text-amber-900/80">Your active sales manager profile is missing. Ask an administrator to review your role assignment before creating orders.</p></section></div>;
   }
@@ -49,7 +52,7 @@ async function NewOrderContent({ searchParams }: { searchParams: Promise<{ accou
         initialPlatformFee={String(settingsResult.data.real_fee_percent)}
         dummyPayoutPercent={String(settingsResult.data.dummy_payout_percent)}
         defaultDiscountPercent={String(settingsResult.data.default_discount_percent)}
-        canCreateDummy={profile.role === "admin"}
+        canCreateDummy={profile.role === "admin" || Boolean(managerPermissionResult?.data)}
         defaultAccountId={typeof query.accountId === "string" ? query.accountId : undefined}
         fixedManager={fixedManager}
       />}
