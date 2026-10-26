@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { PageLoader } from "@/components/page-loader";
 import { ReportsWorkspace, type AccountReport, type ManagerReport } from "@/components/reports/reports-workspace";
 import { toCents } from "@/lib/accounts/money";
-import { createClient } from "@/lib/supabase/server";
+import { createRequestClient } from "@/lib/supabase/request";
 
 type AccountRow = { id: string; name: string; active: boolean };
 type ManagerRow = { id: string; name: string; account_id: string; target: number | string; active: boolean };
@@ -14,11 +14,11 @@ export default function ReportsPage() {
 }
 
 async function ReportsContent() {
-  const supabase = await createClient();
+  const supabase = await createRequestClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/");
-  const { data: profile } = await supabase.from("profiles").select("status").eq("id", user.id).maybeSingle();
-  if (profile?.status !== "active") redirect("/dashboard");
+  const { data: profile } = await supabase.from("profiles").select("role, status").eq("id", user.id).maybeSingle();
+  if (profile?.status !== "active" || profile.role !== "admin") redirect("/dashboard");
 
   const [accountsResult, managersResult, ordersResult] = await Promise.all([
     supabase.from("accounts").select("id, name, active").order("name"),

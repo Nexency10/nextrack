@@ -2,14 +2,14 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { PageLoader } from "@/components/page-loader";
 import { WorkspaceSettings } from "@/components/settings/workspace-settings";
-import { createClient } from "@/lib/supabase/server";
+import { createRequestClient } from "@/lib/supabase/request";
 
 export default function SettingsPage() {
   return <Suspense fallback={<PageLoader />}><SettingsContent /></Suspense>;
 }
 
 async function SettingsContent() {
-  const supabase = await createClient();
+  const supabase = await createRequestClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/");
   const { data: profile } = await supabase.from("profiles").select("role, status").eq("id", user.id).maybeSingle();

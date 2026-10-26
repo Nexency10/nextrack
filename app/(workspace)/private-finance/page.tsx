@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { PageLoader } from "@/components/page-loader";
 import { PrivateFinanceWorkspace, type DummyOrderItem, type PlatformFinanceItem } from "@/components/private-finance/private-finance-workspace";
 import { toCents } from "@/lib/accounts/money";
-import { createClient } from "@/lib/supabase/server";
+import { createRequestClient } from "@/lib/supabase/request";
 
 type DummyOrderRow = {
   id: string;
@@ -23,7 +23,7 @@ export default function PrivateFinancePage() {
 }
 
 async function PrivateFinanceContent() {
-  const supabase = await createClient();
+  const supabase = await createRequestClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/");
   const { data: profile } = await supabase.from("profiles").select("role, status").eq("id", user.id).maybeSingle();

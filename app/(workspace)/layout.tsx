@@ -3,14 +3,14 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import { PageLoader } from "@/components/page-loader";
-import { createClient } from "@/lib/supabase/server";
+import { createRequestClient } from "@/lib/supabase/request";
 
 export default function WorkspaceLayout({ children }: { children: ReactNode }) {
   return <Suspense fallback={<PageLoader />}><WorkspaceContent>{children}</WorkspaceContent></Suspense>;
 }
 
 async function WorkspaceContent({ children }: { children: ReactNode }) {
-  const supabase = await createClient();
+  const supabase = await createRequestClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/");
 

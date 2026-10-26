@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { OrdersWorkspace, type OrderItem } from "@/components/orders/orders-workspace";
 import { PageLoader } from "@/components/page-loader";
-import { createClient } from "@/lib/supabase/server";
+import { createRequestClient } from "@/lib/supabase/request";
 
 type OrderRow = {
   id: string;
@@ -23,7 +23,7 @@ export default function OrdersPage() {
 }
 
 async function OrdersContent() {
-  const supabase = await createClient();
+  const supabase = await createRequestClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/");
   const { data: profile } = await supabase.from("profiles").select("role, status").eq("id", user.id).maybeSingle();

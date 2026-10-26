@@ -461,9 +461,10 @@ create policy "Managers delete sales managers"
   using ((select private.can_manage_workspace()));
 
 drop policy if exists "Active members read dashboard counts" on public.dashboard_counts;
-create policy "Active members read dashboard counts"
+drop policy if exists "Admins read dashboard counts" on public.dashboard_counts;
+create policy "Admins read dashboard counts"
   on public.dashboard_counts for select to authenticated
-  using ((select private.is_active_member()));
+  using ((select private.is_active_admin()));
 
 drop policy if exists "Members read real orders and admins read all" on public.orders;
 create policy "Members read real orders and admins read all"
@@ -563,6 +564,9 @@ begin
     select 1 from public.profiles
     where id = current_user_id and role = 'admin' and status = 'active'
   );
+  if not admin_access then
+    raise exception 'Administrator access required' using errcode = '42501';
+  end if;
 
   select jsonb_build_object(
     'totalSales', coalesce(sum(amount) filter (where order_type = 'real'), 0),

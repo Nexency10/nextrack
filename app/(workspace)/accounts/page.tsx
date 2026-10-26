@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { AccountOverview, type AccountCardData, type AccountPlatformData } from "@/components/accounts/account-overview";
 import { PageLoader } from "@/components/page-loader";
 import { formatCents, toCents } from "@/lib/accounts/money";
-import { createClient } from "@/lib/supabase/server";
+import { createRequestClient } from "@/lib/supabase/request";
 
 type AccountRow = { id: string; name: string; active: boolean };
 type OrderRow = { account_id: string; platform: string; order_type: "real" | "dummy"; amount: number | string; seller_receives: number | string; status: string };
@@ -13,21 +13,23 @@ export default function AccountsPage() {
 }
 
 async function AccountsContent() {
-  const supabase = await createClient();
+  const supabase = await createRequestClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/");
   const { data: profile } = await supabase.from("profiles").select("role, status").eq("id", user.id).maybeSingle();
   if (profile?.status !== "active") redirect("/dashboard");
 
+  const isAdmin = profile.role === "admin";
   const [accountsResult, ordersResult] = await Promise.all([
     supabase.from("accounts").select("id, name, active").order("name"),
-    supabase.from("orders").select("account_id, platform, order_type, amount, seller_receives, status"),
+    isAdmin
+      ? supabase.from("orders").select("account_id, platform, order_type, amount, seller_receives, status")
+      : Promise.resolve({ data: [], error: null }),
   ]);
   if (accountsResult.error || ordersResult.error) return <AccountDataError message={(accountsResult.error ?? ordersResult.error)?.message ?? "Account data is unavailable."} />;
 
   const accounts = (accountsResult.data ?? []) as AccountRow[];
   const orders = (ordersResult.data ?? []) as OrderRow[];
-  const isAdmin = profile.role === "admin";
   const accountCards: AccountCardData[] = accounts.map((account) => {
     const accountOrders = orders.filter((order) => order.account_id === account.id && order.status !== "Cancelled");
     const realOrders = accountOrders.filter((order) => order.order_type === "real");
@@ -36,11 +38,11 @@ async function AccountsContent() {
       id: account.id,
       name: account.name,
       active: account.active,
-      realOrders: realOrders.length,
+      realOrders: isAdmin ? realOrders.length : 0,
       dummyOrders: isAdmin ? dummyOrders.length : null,
-      visibleOrders: accountOrders.length,
-      sales: formatCents(realOrders.reduce((total, order) => total + toCents(order.amount), 0n)),
-      netRevenue: formatCents(realOrders.reduce((total, order) => total + toCents(order.seller_receives), 0n)),
+      visibleOrders: isAdmin ? accountOrders.length : 0,
+      sales: isAdmin ? formatCents(realOrders.reduce((total, order) => total + toCents(order.amount), 0n)) : "",
+      netRevenue: isAdmin ? formatCents(realOrders.reduce((total, order) => total + toCents(order.seller_receives), 0n)) : "",
     };
   });
 
@@ -56,11 +58,11 @@ async function AccountsContent() {
         accountId: account.id,
         accountName: account.name,
         platform,
-        realOrders: realOrders.length,
+        realOrders: isAdmin ? realOrders.length : 0,
         dummyOrders: isAdmin ? dummyOrders.length : null,
-        visibleOrders: platformOrders.length,
-        sales: formatCents(realOrders.reduce((total, order) => total + toCents(order.amount), 0n)),
-        netRevenue: formatCents(realOrders.reduce((total, order) => total + toCents(order.seller_receives), 0n)),
+        visibleOrders: isAdmin ? platformOrders.length : 0,
+        sales: isAdmin ? formatCents(realOrders.reduce((total, order) => total + toCents(order.amount), 0n)) : "",
+        netRevenue: isAdmin ? formatCents(realOrders.reduce((total, order) => total + toCents(order.seller_receives), 0n)) : "",
       });
     }
   }

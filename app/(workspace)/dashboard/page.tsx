@@ -5,7 +5,7 @@ import { Activity, BadgeDollarSign, Building2, ChartNoAxesCombined, CircleHelp, 
 import { signOut } from "@/app/actions/auth";
 import { SalesCharts, type ChartPoint } from "@/components/dashboard/sales-charts";
 import { PageLoader } from "@/components/page-loader";
-import { createClient } from "@/lib/supabase/server";
+import { createRequestClient } from "@/lib/supabase/request";
 
 type AccountMetric = { id: string; name: string; active: boolean; realOrderCount: number; sales: number; netRevenue: number };
 type DashboardMetrics = {
@@ -25,7 +25,7 @@ export default function DashboardPage() {
 }
 
 async function DashboardContent() {
-  const supabase = await createClient();
+  const supabase = await createRequestClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/");
   const { data: profile, error: profileError } = await supabase.from("profiles").select("full_name, username, role, status").eq("id", user.id).maybeSingle();
@@ -34,7 +34,10 @@ async function DashboardContent() {
   if (profile.status === "banned") return <AccountNotice email={user.email ?? ""} banned />;
   if (profile.status !== "active") return <AccountNotice email={user.email ?? ""} detail="This account does not have active workspace access." />;
 
-  const { data, error } = await supabase.rpc("get_dashboard_metrics");
+  const isAdmin = profile.role === "admin";
+  const { data, error } = isAdmin
+    ? await supabase.rpc("get_dashboard_metrics")
+    : { data: null, error: null };
   const metrics = data as unknown as DashboardMetrics | null;
   const name = profile.full_name || user.user_metadata.full_name || user.email || "there";
   const accounts = metrics?.accounts ?? [];
@@ -46,7 +49,7 @@ async function DashboardContent() {
 
         {profile.role === "viewer" && <section className="mb-5 flex items-start gap-3 rounded-[16px] border border-violet-200 bg-violet-50 px-4 py-3.5 text-violet-950"><span className="mt-0.5"><ShieldCheck size={16} /></span><div><h2 className="text-xs font-semibold">View-only access</h2><p className="mt-1 text-[11px] leading-5 text-violet-900/75">You can explore workspace data. An administrator can assign a workspace role from Sales managers to enable management tools.</p></div></section>}
 
-        {error ? <DataSetupNotice message={error.message} /> : metrics ? <>
+        {!isAdmin ? <section className="rounded-[18px] border border-[#e9ebf2] bg-white p-6 text-sm text-[#777c90] shadow-[0_8px_28px_rgba(35,39,76,.035)]">Dashboard calculations and reports are available to administrators only.</section> : error ? <DataSetupNotice message={error.message} /> : metrics ? <>
           <section className="mb-5 grid gap-4 sm:grid-cols-2 2xl:grid-cols-4" aria-label="Sales key performance indicators">
             <MetricCard label="Total sales" value={money.format(Number(metrics.totalSales))} detail={`${metrics.realOrderCount} real orders`} icon={<BadgeDollarSign size={18} />} tone="violet" />
             <MetricCard label="Net revenue" value={money.format(Number(metrics.netRevenue))} detail="After platform fees" icon={<ChartNoAxesCombined size={18} />} tone="green" />
@@ -62,7 +65,7 @@ async function DashboardContent() {
           </section>
         </> : <DataSetupNotice message="Dashboard data was not returned. Apply the dashboard Supabase migration, then reload this page." />}
 
-        <footer className="mt-7 flex items-center gap-2 text-[10px] text-[#a0a3b1] print:hidden"><CircleHelp size={13} /> All sales figures exclude cancelled orders. Dummy order details are restricted to administrators.</footer>
+        {isAdmin && <footer className="mt-7 flex items-center gap-2 text-[10px] text-[#a0a3b1] print:hidden"><CircleHelp size={13} /> All sales figures exclude cancelled orders. Dummy order details are restricted to administrators.</footer>}
   </div>;
 }
 

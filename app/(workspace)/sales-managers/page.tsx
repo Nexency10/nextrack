@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { SalesManagersWorkspace, type SalesManagerItem } from "@/components/managers/sales-managers-workspace";
 import { PageLoader } from "@/components/page-loader";
 import { formatCents, toCents } from "@/lib/accounts/money";
-import { createClient } from "@/lib/supabase/server";
+import { createRequestClient } from "@/lib/supabase/request";
 
 type ManagerRow = { id: string; name: string; account_id: string; target: string | number; active: boolean; profile_id: string | null };
 type AccountRow = { id: string; name: string; active: boolean };
@@ -15,17 +15,20 @@ export default function SalesManagersPage() {
 }
 
 async function SalesManagersContent() {
-  const supabase = await createClient();
+  const supabase = await createRequestClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/");
   const { data: profile } = await supabase.from("profiles").select("role, status").eq("id", user.id).maybeSingle();
   if (profile?.status !== "active") redirect("/dashboard");
 
+  const isAdmin = profile.role === "admin";
   const [managersResult, accountsResult, ordersResult, membersResult, permissionsResult] = await Promise.all([
     supabase.from("sales_managers").select("id, name, account_id, target, active, profile_id").order("name"),
     supabase.from("accounts").select("id, name, active").order("name"),
-    supabase.from("orders").select("manager_id, order_type, amount, status").eq("order_type", "real").neq("status", "Cancelled"),
-    profile.role === "admin"
+    isAdmin
+      ? supabase.from("orders").select("manager_id, order_type, amount, status").eq("order_type", "real").neq("status", "Cancelled")
+      : Promise.resolve({ data: [], error: null }),
+    isAdmin
       ? supabase.from("profiles").select("id, full_name, email, role, status").eq("status", "active").eq("role", "viewer").order("full_name")
       : Promise.resolve({ data: [] as MemberRow[], error: null }),
     profile.role === "admin"
@@ -53,9 +56,9 @@ async function SalesManagersContent() {
       accountName: account?.name ?? "Unknown account",
       accountActive: account?.active ?? false,
       target: String(manager.target),
-      sales: formatCents(managerSales.get(manager.id) ?? 0n),
-      salesCents: (managerSales.get(manager.id) ?? 0n).toString(),
-      orderCount: managerOrderCounts.get(manager.id) ?? 0,
+      sales: isAdmin ? formatCents(managerSales.get(manager.id) ?? 0n) : "",
+      salesCents: isAdmin ? (managerSales.get(manager.id) ?? 0n).toString() : "0",
+      orderCount: isAdmin ? managerOrderCounts.get(manager.id) ?? 0 : 0,
       active: manager.active,
       profileId: manager.profile_id,
       profileRole: manager.profile_id

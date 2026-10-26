@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createRequestClient } from "@/lib/supabase/request";
 import { SalaryWorkspace, type PayrollRecord, type SalaryEmployee } from "@/components/salary/salary-workspace";
 
 type SalaryPageProps = { searchParams: Promise<{ month?: string | string[] }> };
@@ -11,7 +11,7 @@ export default async function SalaryPage({ searchParams }: SalaryPageProps) {
     ? requestedMonth
     : new Date().toISOString().slice(0, 7);
 
-  const supabase = await createClient();
+  const supabase = await createRequestClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/");
 

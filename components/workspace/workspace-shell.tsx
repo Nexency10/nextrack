@@ -21,7 +21,7 @@ export function WorkspaceShell({ children, name, role, email }: { children: Reac
     { label: "Accounts", href: "/accounts", icon: <Building2 size={17} /> },
     { label: "Salary", href: "/salary", icon: <WalletCards size={17} />, admin: true },
     { label: "Sales managers", href: "/sales-managers", icon: <Users size={17} /> },
-    { label: "Reports", href: "/reports", icon: <BarChart3 size={17} /> },
+    { label: "Reports", href: "/reports", icon: <BarChart3 size={17} />, admin: true },
     { label: "Private finance", href: "/private-finance", icon: <LockKeyhole size={17} />, admin: true },
     { label: "Settings", href: "/settings", icon: <Settings2 size={17} />, admin: true },
     { label: "Team access", href: "/admin/users", icon: <ShieldCheck size={17} />, admin: true },

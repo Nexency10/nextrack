@@ -4,7 +4,7 @@ import { LockKeyhole, ReceiptText } from "lucide-react";
 import { OrderForm } from "@/components/orders/order-form";
 import { QuickCreateAccount } from "@/components/orders/quick-create-account";
 import { PageLoader } from "@/components/page-loader";
-import { createClient } from "@/lib/supabase/server";
+import { createRequestClient } from "@/lib/supabase/request";
 
 export default function NewOrderPage({ searchParams }: PageProps<"/orders/new">) {
   return <Suspense fallback={<PageLoader />}><NewOrderContent searchParams={searchParams} /></Suspense>;
@@ -12,7 +12,7 @@ export default function NewOrderPage({ searchParams }: PageProps<"/orders/new">)
 
 async function NewOrderContent({ searchParams }: { searchParams: Promise<{ accountId?: string | string[] }> }) {
   const query = await searchParams;
-  const supabase = await createClient();
+  const supabase = await createRequestClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/");
 

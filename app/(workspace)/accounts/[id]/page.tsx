@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { AccountDetails } from "@/components/accounts/account-details";
 import { PageLoader } from "@/components/page-loader";
 import { formatCents, toCents } from "@/lib/accounts/money";
-import { createClient } from "@/lib/supabase/server";
+import { createRequestClient } from "@/lib/supabase/request";
 
 type OrderRow = {
   id: string;
@@ -21,7 +21,7 @@ export default function AccountDetailsPage({ params }: PageProps<"/accounts/[id]
 
 async function AccountDetailsContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
+  const supabase = await createRequestClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/");
 
@@ -39,7 +39,7 @@ async function AccountDetailsContent({ params }: { params: Promise<{ id: string 
   const activeOrders = orderRows.filter((order) => order.status !== "Cancelled");
   const realOrders = activeOrders.filter((order) => order.order_type === "real");
   const isAdmin = profile.role === "admin";
-  const platforms = [...new Set(activeOrders.map((order) => order.platform))].sort().map((platform) => {
+  const platforms = isAdmin ? [...new Set(activeOrders.map((order) => order.platform))].sort().map((platform) => {
     const matching = activeOrders.filter((order) => order.platform === platform);
     const real = matching.filter((order) => order.order_type === "real");
     const dummy = matching.filter((order) => order.order_type === "dummy");
@@ -51,16 +51,17 @@ async function AccountDetailsContent({ params }: { params: Promise<{ id: string 
       sales: formatCents(real.reduce((total, order) => total + toCents(order.amount), 0n)),
       netRevenue: formatCents(real.reduce((total, order) => total + toCents(order.seller_receives), 0n)),
     };
-  });
+  }) : [];
 
   return <AccountDetails
     account={accountResult.data}
     orders={orderRows.map((order) => ({ id: order.id, orderDate: order.order_date, platform: order.platform, orderType: order.order_type, amount: formatCents(toCents(order.amount)), status: order.status }))}
     platforms={platforms}
-    realSales={formatCents(realOrders.reduce((total, order) => total + toCents(order.amount), 0n))}
-    netRevenue={formatCents(realOrders.reduce((total, order) => total + toCents(order.seller_receives), 0n))}
-    realOrderCount={realOrders.length}
-    visibleOrderCount={activeOrders.length}
+    realSales={isAdmin ? formatCents(realOrders.reduce((total, order) => total + toCents(order.amount), 0n)) : ""}
+    netRevenue={isAdmin ? formatCents(realOrders.reduce((total, order) => total + toCents(order.seller_receives), 0n)) : ""}
+    realOrderCount={isAdmin ? realOrders.length : 0}
+    visibleOrderCount={isAdmin ? activeOrders.length : 0}
+    isAdmin={isAdmin}
     canManage={["admin", "manager"].includes(profile.role)}
   />;
 }

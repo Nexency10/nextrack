@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { ShieldCheck, Users } from "lucide-react";
 import { UserAccessActions } from "@/components/admin/user-access-actions";
-import { createClient } from "@/lib/supabase/server";
+import { createRequestClient } from "@/lib/supabase/request";
 import { PageLoader } from "@/components/page-loader";
 
 export default function UsersPage() {
@@ -10,7 +10,7 @@ export default function UsersPage() {
 }
 
 async function UsersContent() {
-  const supabase = await createClient();
+  const supabase = await createRequestClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/");
   const { data: actor } = await supabase.from("profiles").select("role, status").eq("id", user.id).maybeSingle();
