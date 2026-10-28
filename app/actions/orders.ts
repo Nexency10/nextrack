@@ -76,12 +76,13 @@ export async function createOrder(_previousState: ActionState, formData: FormDat
       .from("sales_managers")
       .select("id")
       .eq("profile_id", user.id)
-      .eq("account_id", accountId)
       .eq("active", true)
       .maybeSingle();
     if (managerAssignmentError || !assignedManager) {
-      return { error: "You can only create orders for your active assigned account." };
+      return { error: "Your active sales manager assignment is unavailable." };
     }
+    const { data: accountAssignment, error: accountAssignmentError } = await supabase.from("sales_manager_accounts").select("account_id").eq("manager_id", assignedManager.id).eq("account_id", accountId).maybeSingle();
+    if (accountAssignmentError || !accountAssignment) return { error: "You can only create orders for an account assigned to you." };
     managerId = assignedManager.id;
     if (orderType === "dummy") {
       const { data: permission, error: permissionError } = await supabase
@@ -104,11 +105,14 @@ export async function createOrder(_previousState: ActionState, formData: FormDat
   if (managerId) {
     const { data: manager, error: managerError } = await supabase
       .from("sales_managers")
-      .select("id")
+      .select("id, account_id, profile_id")
       .eq("id", managerId)
-      .eq("account_id", accountId)
       .eq("active", true)
       .maybeSingle();
+    if (!managerError && manager && manager.profile_id) {
+      const { data: assignedAccount } = await supabase.from("sales_manager_accounts").select("account_id").eq("manager_id", manager.id).eq("account_id", accountId).maybeSingle();
+      if (!assignedAccount) return { error: "Choose a manager assigned to this account." };
+    } else if (!managerError && manager && manager.account_id !== accountId) return { error: "Choose a manager assigned to this account." };
     if (managerError || !manager) return { error: "Choose an active sales manager assigned to this account." };
   }
 

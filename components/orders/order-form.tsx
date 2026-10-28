@@ -5,7 +5,7 @@ import { ArrowRight, BadgeCheck, Banknote, CalendarDays, CircleDollarSign, Info,
 import { createOrder } from "@/app/actions/orders";
 
 type AccountOption = { id: string; name: string };
-type ManagerOption = { id: string; name: string; account_id: string };
+type ManagerOption = { id: string; name: string; account_id: string; assigned_account_ids?: string[] };
 
 const platforms = ["WordPress", "Squarespace", "Wix", "Shopify", "Webflow"];
 const fieldClass = "mt-2 h-12 w-full rounded-xl border border-[#e6e8ef] bg-[#fbfbfe] px-3.5 text-sm text-[#2c2f43] outline-none transition focus:border-[#9b8df0] focus:bg-white focus:ring-4 focus:ring-[#7057ed]/[.08]";
@@ -58,7 +58,7 @@ export function OrderForm({
   const [discountText, setDiscountText] = useState(defaultDiscountPercent);
   const [platformFeeText, setPlatformFeeText] = useState(initialPlatformFee);
   const [managerId, setManagerId] = useState(fixedManager?.id ?? "");
-  const availableManagers = useMemo(() => managers.filter((manager) => manager.account_id === accountId), [accountId, managers]);
+  const availableManagers = useMemo(() => managers.filter((manager) => (manager.assigned_account_ids ?? [manager.account_id]).includes(accountId)), [accountId, managers]);
   const amount = toMinorUnits(amountText);
   const serviceFee = toMinorUnits(serviceFeeText);
   const discount = asBasisPoints(discountText);

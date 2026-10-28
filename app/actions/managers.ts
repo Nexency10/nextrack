@@ -14,7 +14,7 @@ export async function assignWorkspaceRole(_previousState: ManagerActionState, fo
 
   const profileId = String(formData.get("profileId") ?? "").trim();
   const role = String(formData.get("role") ?? "");
-  const accountId = String(formData.get("accountId") ?? "").trim();
+  const accountIds = [...new Set(formData.getAll("accountIds").map((value) => String(value).trim()).filter(Boolean))];
   const target = role === "manager" ? parseTarget(formData.get("target")) : "0.00";
   if (!/^[0-9a-f-]{36}$/i.test(profileId) || profileId === user.id) return { error: "Choose a valid team member." };
   if (role !== "manager" && role !== "viewer") return { error: "Choose a supported workspace role." };
@@ -23,9 +23,9 @@ export async function assignWorkspaceRole(_previousState: ManagerActionState, fo
   const { data: member, error: memberError } = await supabase.from("profiles").select("id, full_name, email, role, status").eq("id", profileId).maybeSingle();
   if (memberError || !member || member.status !== "active" || member.role === "admin") return { error: "Only approved non-admin users can be assigned here." };
   if (role === "manager") {
-    if (!/^[0-9a-f-]{36}$/i.test(accountId)) return { error: "Choose an active account for the sales manager." };
-    const { data: account, error: accountError } = await supabase.from("accounts").select("id").eq("id", accountId).eq("active", true).maybeSingle();
-    if (accountError || !account) return { error: "Choose an active account." };
+    if (!accountIds.length || accountIds.some((id) => !/^[0-9a-f-]{36}$/i.test(id))) return { error: "Choose at least one active account for the sales manager." };
+    const { data: validAccounts, error: accountError } = await supabase.from("accounts").select("id").in("id", accountIds).eq("active", true);
+    if (accountError || validAccounts?.length !== accountIds.length) return { error: "Choose only active accounts." };
   }
 
   const { data: updatedProfile, error: profileUpdateError } = await supabase.from("profiles").update({ role }).eq("id", profileId).eq("status", "active").neq("role", "admin").select("id").maybeSingle();
@@ -34,17 +34,21 @@ export async function assignWorkspaceRole(_previousState: ManagerActionState, fo
 
   if (role === "manager") {
     const managerName = member.full_name.trim() || member.email;
-    const { error } = await supabase.from("sales_managers").upsert({
+    const { data: manager, error } = await supabase.from("sales_managers").upsert({
       profile_id: profileId,
       name: managerName,
-      account_id: accountId,
+      account_id: accountIds[0],
       target,
       active: true,
-    }, { onConflict: "profile_id" });
+    }, { onConflict: "profile_id" }).select("id").single();
     if (error) {
       await supabase.from("profiles").update({ role: member.role }).eq("id", profileId).neq("role", "admin");
       return { error: error.message };
     }
+    const { error: clearError } = await supabase.from("sales_manager_accounts").delete().eq("manager_id", manager.id);
+    if (clearError) return { error: clearError.message };
+    const { error: assignError } = await supabase.from("sales_manager_accounts").insert(accountIds.map((account_id) => ({ manager_id: manager.id, account_id })));
+    if (assignError) return { error: assignError.message };
   } else {
     const { data: linkedManager } = await supabase.from("sales_managers").select("id").eq("profile_id", profileId).maybeSingle();
     if (linkedManager) {
@@ -142,8 +146,10 @@ export async function saveSalesManager(_previousState: ManagerActionState, formD
     if (error) return { error: error.message };
     if (!data) return { error: "This manager could not be found or updated." };
   } else {
-    const { error } = await access.supabase.from("sales_managers").insert({ name, account_id: accountId, target });
+    const { data: manager, error } = await access.supabase.from("sales_managers").insert({ name, account_id: accountId, target }).select("id").single();
     if (error) return { error: error.message };
+    const { error: assignmentError } = await access.supabase.from("sales_manager_accounts").insert({ manager_id: manager.id, account_id: accountId });
+    if (assignmentError) return { error: assignmentError.message };
   }
 
   revalidateManagerViews();

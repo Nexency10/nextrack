@@ -19,10 +19,11 @@ async function NewOrderContent({ searchParams }: { searchParams: Promise<{ accou
   const { data: profile } = await supabase.from("profiles").select("full_name, role, status").eq("id", user.id).maybeSingle();
   if (profile?.status !== "active" || !["admin", "manager"].includes(profile.role)) redirect("/dashboard");
 
-  const [accountsResult, managersResult, settingsResult] = await Promise.all([
+  const [accountsResult, managersResult, settingsResult, assignedAccountsResult] = await Promise.all([
     supabase.from("accounts").select("id, name").eq("active", true).order("name"),
     supabase.from("sales_managers").select("id, name, account_id, profile_id").eq("active", true).order("name"),
     supabase.from("app_settings").select("real_fee_percent, dummy_payout_percent, default_discount_percent").eq("id", 1).single(),
+    supabase.from("sales_manager_accounts").select("account_id, manager_id"),
   ]);
 
   const fixedManager = profile.role === "manager"
@@ -35,7 +36,7 @@ async function NewOrderContent({ searchParams }: { searchParams: Promise<{ accou
     return <div className="mx-auto max-w-3xl px-5 py-12 sm:px-8"><section className="rounded-[20px] border border-amber-200 bg-amber-50 p-6"><h1 className="text-base font-semibold text-amber-950">Sales manager assignment unavailable</h1><p className="mt-2 text-sm leading-6 text-amber-900/80">Your active sales manager profile is missing. Ask an administrator to review your role assignment before creating orders.</p></section></div>;
   }
   const availableAccounts = fixedManager
-    ? (accountsResult.data ?? []).filter((account) => account.id === fixedManager.account_id)
+    ? (accountsResult.data ?? []).filter((account) => (assignedAccountsResult.data ?? []).some((assignment) => assignment.manager_id === fixedManager.id && assignment.account_id === account.id))
     : accountsResult.data ?? [];
 
   const displayName = profile.full_name || user.email || "Workspace member";
@@ -46,9 +47,9 @@ async function NewOrderContent({ searchParams }: { searchParams: Promise<{ accou
         <div className="hidden items-center gap-2 rounded-full border border-[#e8eaf2] bg-white px-3 py-2 text-[10px] font-medium text-[#7c8193] sm:inline-flex"><LockKeyhole size={13} className="text-[#7057ed]" /> Saved securely to your workspace</div>
       </div>
 
-      {accountsResult.error ? <SetupNotice message={accountsResult.error.message} /> : settingsResult.error ? <SetupNotice message={settingsResult.error.message} /> : !availableAccounts.length && fixedManager ? <SetupNotice message="Your assigned account is inactive. Ask an administrator to activate the account before creating orders." /> : !availableAccounts.length ? <QuickCreateAccount /> : <OrderForm
+      {accountsResult.error ? <SetupNotice message={accountsResult.error.message} /> : assignedAccountsResult.error ? <SetupNotice message={assignedAccountsResult.error.message} /> : managersResult.error ? <SetupNotice message={managersResult.error.message} /> : settingsResult.error ? <SetupNotice message={settingsResult.error.message} /> : !availableAccounts.length && fixedManager ? <SetupNotice message="Your assigned accounts are inactive. Ask an administrator to activate an assigned account before creating orders." /> : !availableAccounts.length ? <QuickCreateAccount /> : <OrderForm
         accounts={availableAccounts}
-        managers={managersResult.data ?? []}
+        managers={(managersResult.data ?? []).map((manager) => ({ ...manager, assigned_account_ids: (assignedAccountsResult.data ?? []).filter((assignment) => assignment.manager_id === manager.id).map((assignment) => assignment.account_id) }))}
         initialPlatformFee={String(settingsResult.data.real_fee_percent)}
         dummyPayoutPercent={String(settingsResult.data.dummy_payout_percent)}
         defaultDiscountPercent={String(settingsResult.data.default_discount_percent)}

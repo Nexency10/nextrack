@@ -6,6 +6,7 @@ import { formatCents, toCents } from "@/lib/accounts/money";
 import { createRequestClient } from "@/lib/supabase/request";
 
 type ManagerRow = { id: string; name: string; account_id: string; target: string | number; active: boolean; profile_id: string | null };
+type ManagerAccountRow = { manager_id: string; account_id: string };
 type AccountRow = { id: string; name: string; active: boolean };
 type OrderRow = { manager_id: string | null; order_type: string; amount: string | number; status: string };
 type MemberRow = { id: string; full_name: string; email: string; role: string; status: string };
@@ -22,7 +23,7 @@ async function SalesManagersContent() {
   if (profile?.status !== "active") redirect("/dashboard");
 
   const isAdmin = profile.role === "admin";
-  const [managersResult, accountsResult, ordersResult, membersResult, permissionsResult] = await Promise.all([
+  const [managersResult, accountsResult, ordersResult, membersResult, permissionsResult, assignmentsResult] = await Promise.all([
     supabase.from("sales_managers").select("id, name, account_id, target, active, profile_id").order("name"),
     supabase.from("accounts").select("id, name, active").order("name"),
     isAdmin
@@ -34,11 +35,14 @@ async function SalesManagersContent() {
     profile.role === "admin"
       ? supabase.from("dummy_order_manager_permissions").select("manager_id")
       : Promise.resolve({ data: [] as { manager_id: string }[], error: null }),
+    supabase.from("sales_manager_accounts").select("manager_id, account_id"),
   ]);
-  const error = managersResult.error ?? accountsResult.error ?? ordersResult.error ?? membersResult.error ?? permissionsResult.error;
+  const error = managersResult.error ?? accountsResult.error ?? ordersResult.error ?? membersResult.error ?? permissionsResult.error ?? assignmentsResult.error;
   if (error) return <ManagerDataError message={error.message} />;
 
   const accounts = new Map(((accountsResult.data ?? []) as AccountRow[]).map((account) => [account.id, account]));
+  const assignments = new Map<string, string[]>();
+  for (const row of (assignmentsResult.data ?? []) as ManagerAccountRow[]) assignments.set(row.manager_id, [...(assignments.get(row.manager_id) ?? []), row.account_id]);
   const managerSales = new Map<string, bigint>();
   const managerOrderCounts = new Map<string, number>();
   for (const order of (ordersResult.data ?? []) as OrderRow[]) {
@@ -49,12 +53,15 @@ async function SalesManagersContent() {
 
   const managers: SalesManagerItem[] = ((managersResult.data ?? []) as ManagerRow[]).map((manager) => {
     const account = accounts.get(manager.account_id);
+    const assignedIds = assignments.get(manager.id) ?? [manager.account_id];
+    const assignedNames = assignedIds.map((id) => accounts.get(id)?.name).filter((name): name is string => Boolean(name));
     return {
       id: manager.id,
       name: manager.name,
       accountId: manager.account_id,
-      accountName: account?.name ?? "Unknown account",
-      accountActive: account?.active ?? false,
+      accountName: assignedNames.join(", ") || account?.name || "Unknown account",
+      accountIds: assignedIds,
+      accountActive: assignedIds.some((id) => accounts.get(id)?.active),
       target: String(manager.target),
       sales: isAdmin ? formatCents(managerSales.get(manager.id) ?? 0n) : "",
       salesCents: isAdmin ? (managerSales.get(manager.id) ?? 0n).toString() : "0",

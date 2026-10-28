@@ -214,6 +214,18 @@ alter table public.sales_managers
 create unique index if not exists sales_managers_profile_id_unique
   on public.sales_managers (profile_id);
 
+create table if not exists public.sales_manager_accounts (
+  manager_id uuid not null references public.sales_managers (id) on delete cascade,
+  account_id uuid not null references public.accounts (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (manager_id, account_id)
+);
+create index if not exists sales_manager_accounts_account_id_idx
+  on public.sales_manager_accounts (account_id);
+insert into public.sales_manager_accounts (manager_id, account_id)
+select id, account_id from public.sales_managers
+on conflict do nothing;
+
 create table if not exists public.dummy_order_manager_permissions (
   manager_id uuid primary key references public.sales_managers (id) on delete cascade,
   granted_by uuid references auth.users (id) on delete set null default auth.uid(),
@@ -401,14 +413,17 @@ create trigger calculate_order_totals
 alter table public.app_settings enable row level security;
 alter table public.accounts enable row level security;
 alter table public.sales_managers enable row level security;
+alter table public.sales_manager_accounts enable row level security;
 alter table public.dummy_order_manager_permissions enable row level security;
 alter table public.orders enable row level security;
 alter table public.dashboard_counts enable row level security;
 
 revoke all on public.app_settings, public.accounts, public.sales_managers, public.orders, public.dashboard_counts from anon, authenticated;
 revoke all on public.dummy_order_manager_permissions from anon, authenticated;
+revoke all on public.sales_manager_accounts from anon, authenticated;
 grant select on public.app_settings, public.accounts, public.sales_managers, public.orders, public.dashboard_counts to authenticated;
 grant select, insert, update, delete on public.dummy_order_manager_permissions to authenticated;
+grant select, insert, update, delete on public.sales_manager_accounts to authenticated;
 grant insert, update, delete on public.accounts, public.sales_managers to authenticated;
 grant insert, update, delete on public.orders to authenticated;
 grant update (real_fee_percent, dummy_payout_percent, default_discount_percent) on public.app_settings to authenticated;
@@ -460,6 +475,16 @@ create policy "Managers delete sales managers"
   on public.sales_managers for delete to authenticated
   using ((select private.can_manage_workspace()));
 
+drop policy if exists "Active members read manager account assignments" on public.sales_manager_accounts;
+create policy "Active members read manager account assignments"
+  on public.sales_manager_accounts for select to authenticated
+  using ((select private.is_active_member()));
+drop policy if exists "Admins and managers manage account assignments" on public.sales_manager_accounts;
+create policy "Admins and managers manage account assignments"
+  on public.sales_manager_accounts for all to authenticated
+  using ((select private.can_manage_workspace()))
+  with check ((select private.can_manage_workspace()));
+
 drop policy if exists "Active members read dashboard counts" on public.dashboard_counts;
 drop policy if exists "Admins read dashboard counts" on public.dashboard_counts;
 create policy "Admins read dashboard counts"
@@ -486,8 +511,12 @@ create policy "Authorized members create orders"
         select 1 from public.sales_managers as own_manager
         where own_manager.id = manager_id
           and own_manager.profile_id = (select auth.uid())
-          and own_manager.account_id = orders.account_id
           and own_manager.active
+          and exists (
+            select 1 from public.sales_manager_accounts assignment
+            where assignment.manager_id = own_manager.id
+              and assignment.account_id = orders.account_id
+          )
       )
     )
   );
