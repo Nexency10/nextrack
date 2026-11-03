@@ -20,11 +20,12 @@ type DashboardMetrics = {
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
-export default function DashboardPage() {
-  return <Suspense fallback={<PageLoader />}><DashboardContent /></Suspense>;
+export default function DashboardPage({ searchParams }: PageProps<"/dashboard">) {
+  return <Suspense fallback={<PageLoader />}><DashboardContent searchParams={searchParams} /></Suspense>;
 }
 
-async function DashboardContent() {
+async function DashboardContent({ searchParams }: { searchParams: Promise<{ month?: string | string[] }> }) {
+  const query = await searchParams;
   const supabase = await createRequestClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/");
@@ -35,8 +36,13 @@ async function DashboardContent() {
   if (profile.status !== "active") return <AccountNotice email={user.email ?? ""} detail="This account does not have active workspace access." />;
 
   const isAdmin = profile.role === "admin";
+  const currentMonth = getCurrentDhakaMonth();
+  const requestedMonth = Array.isArray(query.month) ? query.month[0] : query.month;
+  const selectedMonth = requestedMonth && /^\d{4}-(0[1-9]|1[0-2])$/.test(requestedMonth) && requestedMonth <= currentMonth ? requestedMonth : currentMonth;
+  const monthStart = `${selectedMonth}-01`;
+  const monthLabel = new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${monthStart}T00:00:00Z`));
   const { data, error } = isAdmin
-    ? await supabase.rpc("get_dashboard_metrics")
+    ? await supabase.rpc("get_dashboard_metrics", { p_month_start: monthStart })
     : { data: null, error: null };
   const metrics = data as unknown as DashboardMetrics | null;
   const name = profile.full_name || user.user_metadata.full_name || user.email || "there";
@@ -45,12 +51,13 @@ async function DashboardContent() {
   const salesByPlatform = (metrics?.salesByPlatform ?? []).map((point) => ({ label: point.label, value: Number(point.value) }));
 
   return <div className="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 lg:px-10 lg:py-9 print:max-w-none print:px-0 print:py-2">
-        <div className="mb-7 flex flex-wrap items-end justify-between gap-4"><div><p className="mb-2 text-[10px] font-semibold tracking-[.17em] text-[#8071dd] uppercase">Sales overview</p><h1 className="text-[30px] leading-tight font-semibold tracking-[-.055em] sm:text-[34px]">Good to see you, {name.split(" ")[0]}.</h1><p className="mt-2 text-[13px] text-[#85899d]">Here’s how your workspace is performing.</p></div><div className="flex flex-wrap gap-2 print:hidden">{(["admin", "manager"] as string[]).includes(profile.role) && <Link href="/orders/new" className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#7057ed] px-3.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-[#6249df]"><FilePlus2 size={14} /> Add order</Link>}{profile.role === "admin" && <Link href="/admin/users" className="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-3.5 text-[11px] font-semibold text-[#5f6479] shadow-sm ring-1 ring-[#e7e8ef] transition hover:text-[#7057ed]"><Users size={14} /> Team access</Link>}</div></div>
+        <div className="mb-7 flex flex-wrap items-end justify-between gap-4"><div><p className="mb-2 text-[10px] font-semibold tracking-[.17em] text-[#8071dd] uppercase">Sales overview · {monthLabel}</p><h1 className="text-[30px] leading-tight font-semibold tracking-[-.055em] sm:text-[34px]">Good to see you, {name.split(" ")[0]}.</h1><p className="mt-2 text-[13px] text-[#85899d]">Monthly workspace performance for {monthLabel}.</p></div><div className="flex flex-wrap items-center gap-2 print:hidden">{profile.role === "admin" && <form action="/dashboard" method="get" className="flex items-center gap-2"><label className="sr-only" htmlFor="dashboard-month">View dashboard month</label><input id="dashboard-month" name="month" type="month" max={currentMonth} value={selectedMonth} onChange={(event) => event.currentTarget.form?.requestSubmit()} className="h-10 rounded-xl border border-[#e7e8ef] bg-white px-3 text-[11px] font-medium text-[#5f6479]" title="Current month opens automatically; choose an earlier month to review its saved totals." /></form>}{(["admin", "manager"] as string[]).includes(profile.role) && <Link href="/orders/new" className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#7057ed] px-3.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-[#6249df]"><FilePlus2 size={14} /> Add order</Link>}{profile.role === "admin" && <Link href="/admin/users" className="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-3.5 text-[11px] font-semibold text-[#5f6479] shadow-sm ring-1 ring-[#e7e8ef] transition hover:text-[#7057ed]"><Users size={14} /> Team access</Link>}</div></div>
 
         {profile.role === "viewer" && <section className="mb-5 flex items-start gap-3 rounded-[16px] border border-violet-200 bg-violet-50 px-4 py-3.5 text-violet-950"><span className="mt-0.5"><ShieldCheck size={16} /></span><div><h2 className="text-xs font-semibold">View-only access</h2><p className="mt-1 text-[11px] leading-5 text-violet-900/75">You can explore workspace data. An administrator can assign a workspace role from Sales managers to enable management tools.</p></div></section>}
 
         {!isAdmin ? <section className="rounded-[18px] border border-[#e9ebf2] bg-white p-6 text-sm text-[#777c90] shadow-[0_8px_28px_rgba(35,39,76,.035)]">Dashboard calculations and reports are available to administrators only.</section> : error ? <DataSetupNotice message={error.message} /> : metrics ? <>
-          <section className="mb-5 grid gap-4 sm:grid-cols-2 2xl:grid-cols-4" aria-label="Sales key performance indicators">
+          <section className="mb-3 flex items-center justify-between text-[10px] text-[#8b8fa1]"><span>{selectedMonth === currentMonth ? "Current month · resets automatically on the first day" : "Archived monthly record · calculated from saved orders"}</span>{selectedMonth !== currentMonth && <Link href="/dashboard" className="font-semibold text-[#7057ed] hover:underline">Back to current month</Link>}</section>
+          <section className="mb-5 grid gap-4 sm:grid-cols-2 2xl:grid-cols-4" aria-label="Monthly sales key performance indicators">
             <MetricCard label="Total sales" value={money.format(Number(metrics.totalSales))} detail={`${metrics.realOrderCount} real orders`} icon={<BadgeDollarSign size={18} />} tone="violet" />
             <MetricCard label="Net revenue" value={money.format(Number(metrics.netRevenue))} detail="After platform fees" icon={<ChartNoAxesCombined size={18} />} tone="green" />
             <MetricCard label="Total orders" value={Number(metrics.totalOrderCount).toLocaleString()} detail="Real and dummy · excludes cancelled" icon={<Activity size={18} />} tone="blue" />
@@ -84,4 +91,11 @@ function AccountNotice({ email, pending = false, banned = false, detail }: { ema
 
 function DataSetupNotice({ message }: { message: string }) {
   return <section className="rounded-[18px] border border-amber-200 bg-amber-50 p-6"><h2 className="text-sm font-semibold text-amber-950">Dashboard data is not ready</h2><p className="mt-2 text-xs leading-5 text-amber-900/75">{message}</p></section>;
+}
+
+function getCurrentDhakaMonth() {
+  const parts = new Intl.DateTimeFormat("en", { year: "numeric", month: "2-digit", timeZone: "Asia/Dhaka" }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")?.value ?? "2026";
+  const month = parts.find((part) => part.type === "month")?.value ?? "01";
+  return `${year}-${month}`;
 }
