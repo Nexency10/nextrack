@@ -19,6 +19,13 @@ export type OrderItem = {
   manager: string;
   status: string;
   notes: string;
+  hasReferral: boolean;
+  referralPercent: string;
+  referralGross: string;
+  referralNet: string;
+  referralClient: string;
+  referralSource: string;
+  referralLink: string;
 };
 
 type AccountOption = { id: string; name: string };
@@ -40,13 +47,13 @@ function formatCents(value: bigint) {
   return `${negative ? "−" : ""}$${whole}.${fraction}`;
 }
 
-export function OrdersWorkspace({ orders, accounts, isAdmin, canManage }: { orders: OrderItem[]; accounts: AccountOption[]; isAdmin: boolean; canManage: boolean }) {
+export function OrdersWorkspace({ orders, accounts, isAdmin, canManage, initialEditId }: { orders: OrderItem[]; accounts: AccountOption[]; isAdmin: boolean; canManage: boolean; initialEditId?: string }) {
   const [accountFilter, setAccountFilter] = useState("");
   const [platformFilter, setPlatformFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
-  const [editing, setEditing] = useState<OrderItem | null>(null);
+  const [editing, setEditing] = useState<OrderItem | null>(() => initialEditId ? orders.find((order) => order.id === initialEditId) ?? null : null);
 
   const visibleOrders = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -108,7 +115,7 @@ function EditOrderDialog({ order, onClose }: { order: OrderItem; onClose: () => 
   const [state, action, pending] = useActionState(updateOrder, {});
   return <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#141326]/50 p-4 backdrop-blur-sm" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !pending) onClose(); }}>
     <section role="dialog" aria-modal="true" aria-labelledby="edit-order-title" className="my-auto w-full max-w-lg rounded-[22px] border border-[#e9ebf2] bg-white p-5 shadow-[0_24px_80px_rgba(18,17,40,.24)] sm:p-7"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-semibold tracking-[.14em] text-[#8071dd] uppercase">{order.account} · {order.platform}</p><h2 id="edit-order-title" className="mt-1 text-lg font-semibold">Edit order</h2><p className="mt-1 text-[11px] text-[#969aab]">Saved totals recalculate from the order amount.</p></div><button type="button" disabled={pending} onClick={onClose} aria-label="Close edit order" className="grid h-9 w-9 place-items-center rounded-lg text-[#85899a] hover:bg-[#f5f5f9]"><X size={17} /></button></div>
-      <form action={action} className="mt-5 space-y-4"><input type="hidden" name="orderId" value={order.id} /><label className="block text-[11px] font-semibold text-[#63687c]">Order amount ($)<input required name="amount" type="number" min="0.01" step="0.01" defaultValue={order.amount} className={`${fieldClass} mt-2`} /></label><label className="block text-[11px] font-semibold text-[#63687c]">Status<select name="status" defaultValue={order.status} className={`${fieldClass} mt-2`}><option>Completed</option><option>Pending</option><option>Cancelled</option></select></label><label className="block text-[11px] font-semibold text-[#63687c]">Notes<textarea name="notes" maxLength={2000} rows={4} defaultValue={order.notes} placeholder="Optional order notes" className="mt-2 w-full resize-y rounded-xl border border-[#e7e8ef] bg-white px-3 py-2.5 text-[11px] outline-none focus:border-[#9b8df0] focus:ring-4 focus:ring-[#7057ed]/[.07]" /></label>{state.error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-[11px] text-rose-800">{state.error}</p>}{state.success && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[11px] text-emerald-800">{state.success}</p>}<div className="flex justify-end gap-2 border-t border-[#eff0f5] pt-4"><button type="button" disabled={pending} onClick={onClose} className="h-10 rounded-xl border border-[#e7e8ef] px-4 text-[11px] font-semibold text-[#686d81]">Cancel</button><button disabled={pending} className="h-10 rounded-xl bg-[#7057ed] px-4 text-[11px] font-semibold text-white disabled:opacity-60">{pending ? "Saving…" : "Save changes"}</button></div></form>
+      <form action={action} className="mt-5 space-y-4"><input type="hidden" name="orderId" value={order.id} /><label className="block text-[11px] font-semibold text-[#63687c]">Order amount ($)<input required name="amount" type="number" min="0.01" step="0.01" defaultValue={order.amount} className={`${fieldClass} mt-2`} /></label><label className="block text-[11px] font-semibold text-[#63687c]">Status<select name="status" defaultValue={order.status} className={`${fieldClass} mt-2`}><option>Completed</option><option>Pending</option><option>Cancelled</option></select></label><fieldset className="rounded-xl border border-[#e9eaf2] p-3"><legend className="px-1 text-[10px] font-semibold text-[#63687c]">Referral</legend><label className="flex items-center gap-2 text-[11px] text-[#555a6e]"><input type="checkbox" name="hasReferral" value="true" defaultChecked={order.hasReferral} className="h-4 w-4 accent-[#7057ed]" /> Referred order</label><div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="text-[10px] font-medium text-[#63687c]">Referral source<input name="referralSourceClient" maxLength={120} defaultValue={order.referralSource} className={`${fieldClass} mt-1`} /></label><label className="text-[10px] font-medium text-[#63687c]">Client receiving referral<input name="referralClientName" maxLength={120} defaultValue={order.referralClient} className={`${fieldClass} mt-1`} /></label><label className="text-[10px] font-medium text-[#63687c]">Referral percentage<input name="referralPercent" type="number" min="0" max="100" step="0.01" defaultValue={order.referralPercent} className={`${fieldClass} mt-1`} /></label><label className="text-[10px] font-medium text-[#63687c]">Referral link<input name="referralLink" type="url" maxLength={500} defaultValue={order.referralLink} className={`${fieldClass} mt-1`} /></label></div>{order.hasReferral && <p className="mt-2 text-[10px] text-[#777c90]">Current referral: {formatCents(toCents(order.referralGross))} gross · {formatCents(toCents(order.referralNet))} net</p>}</fieldset><label className="block text-[11px] font-semibold text-[#63687c]">Notes<textarea name="notes" maxLength={2000} rows={4} defaultValue={order.notes} placeholder="Optional order notes" className="mt-2 w-full resize-y rounded-xl border border-[#e7e8ef] bg-white px-3 py-2.5 text-[11px] outline-none focus:border-[#9b8df0] focus:ring-4 focus:ring-[#7057ed]/[.07]" /></label>{state.error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-[11px] text-rose-800">{state.error}</p>}{state.success && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[11px] text-emerald-800">{state.success}</p>}<div className="flex justify-end gap-2 border-t border-[#eff0f5] pt-4"><button type="button" disabled={pending} onClick={onClose} className="h-10 rounded-xl border border-[#e7e8ef] px-4 text-[11px] font-semibold text-[#686d81]">Cancel</button><button disabled={pending} className="h-10 rounded-xl bg-[#7057ed] px-4 text-[11px] font-semibold text-white disabled:opacity-60">{pending ? "Saving…" : "Save changes"}</button></div></form>
     </section>
   </div>;
 }

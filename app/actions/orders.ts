@@ -56,6 +56,11 @@ export async function createOrder(_previousState: ActionState, formData: FormDat
   const platformFee = parseDecimal(formData.get("platformFeePercent"), 10_000n);
   let managerId = String(formData.get("managerId") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
+  const hasReferral = formData.get("hasReferral") === "true";
+  const referralPercent = hasReferral ? parseDecimal(formData.get("referralPercent"), 10_000n) : 0n;
+  const referralClientName = String(formData.get("referralClientName") ?? "").trim();
+  const referralSourceClient = String(formData.get("referralSourceClient") ?? "").trim();
+  const referralLink = String(formData.get("referralLink") ?? "").trim();
 
   if (orderType !== "real" && orderType !== "dummy") return { error: "Choose a valid order type." };
   if (orderType === "dummy" && profile.role !== "admin" && profile.role !== "manager") return { error: "Dummy-order permission is required." };
@@ -70,6 +75,9 @@ export async function createOrder(_previousState: ActionState, formData: FormDat
     return { error: "Choose a valid order date." };
   }
   if (notes.length > 2_000) return { error: "Notes must be 2,000 characters or fewer." };
+  if (hasReferral && (referralPercent === null || !referralClientName || !referralSourceClient)) return { error: "Add a valid referral percentage, source client, and receiving client." };
+  if (referralClientName.length > 120 || referralSourceClient.length > 120 || referralLink.length > 500) return { error: "Referral details exceed the allowed length." };
+  if (referralLink && !/^https?:\/\//i.test(referralLink)) return { error: "Referral link must start with http:// or https://." };
 
   if (profile.role === "manager") {
     const { data: assignedManager, error: managerAssignmentError } = await supabase
@@ -140,6 +148,11 @@ export async function createOrder(_previousState: ActionState, formData: FormDat
     manager_id: managerId || null,
     status,
     notes,
+    has_referral: hasReferral,
+    referral_percent: asDecimal(referralPercent ?? 0n),
+    referral_client_name: hasReferral ? referralClientName : "",
+    referral_source_client: hasReferral ? referralSourceClient : "",
+    referral_link: hasReferral ? referralLink : "",
     created_by: user.id,
   });
 
@@ -149,6 +162,7 @@ export async function createOrder(_previousState: ActionState, formData: FormDat
   revalidatePath("/orders/new");
   revalidatePath("/reports");
   revalidatePath("/private-finance");
+  revalidatePath("/referrals");
   redirect("/orders");
 }
 
@@ -160,12 +174,20 @@ export async function updateOrder(_previousState: ActionState, formData: FormDat
   const amount = parseDecimal(formData.get("amount"), MAX_DECIMAL_UNITS);
   const status = String(formData.get("status") ?? "");
   const notes = String(formData.get("notes") ?? "").trim();
+  const hasReferral = formData.get("hasReferral") === "true";
+  const referralPercent = hasReferral ? parseDecimal(formData.get("referralPercent"), 10_000n) : 0n;
+  const referralClientName = String(formData.get("referralClientName") ?? "").trim();
+  const referralSourceClient = String(formData.get("referralSourceClient") ?? "").trim();
+  const referralLink = String(formData.get("referralLink") ?? "").trim();
   if (!/^[0-9a-f-]{36}$/i.test(id)) return { error: "Choose a valid order." };
   if (amount === null || amount <= 0n) return { error: "Enter an order amount greater than zero, with no more than two decimal places." };
   if (!(STATUSES as readonly string[]).includes(status)) return { error: "Choose a valid order status." };
   if (notes.length > 2_000) return { error: "Notes must be 2,000 characters or fewer." };
+  if (hasReferral && (referralPercent === null || !referralClientName || !referralSourceClient)) return { error: "Add a valid referral percentage, source client, and receiving client." };
+  if (referralClientName.length > 120 || referralSourceClient.length > 120 || referralLink.length > 500) return { error: "Referral details exceed the allowed length." };
+  if (referralLink && !/^https?:\/\//i.test(referralLink)) return { error: "Referral link must start with http:// or https://." };
 
-  let query = operator.supabase.from("orders").update({ amount: asDecimal(amount), status, notes }).eq("id", id);
+  let query = operator.supabase.from("orders").update({ amount: asDecimal(amount), status, notes, has_referral: hasReferral, referral_percent: asDecimal(referralPercent ?? 0n), referral_client_name: hasReferral ? referralClientName : "", referral_source_client: hasReferral ? referralSourceClient : "", referral_link: hasReferral ? referralLink : "" }).eq("id", id);
   if (operator.profile.role !== "admin") query = query.eq("order_type", "real");
   const { data, error } = await query.select("id").maybeSingle();
   if (error || !data) return { error: error?.message ?? "That order could not be updated." };
@@ -174,6 +196,7 @@ export async function updateOrder(_previousState: ActionState, formData: FormDat
   revalidatePath("/dashboard");
   revalidatePath("/reports");
   revalidatePath("/private-finance");
+  revalidatePath("/referrals");
   return { success: "Order updated. Its totals have been recalculated." };
 }
 

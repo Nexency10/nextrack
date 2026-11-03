@@ -36,6 +36,7 @@ export function OrderForm({
   initialPlatformFee,
   dummyPayoutPercent,
   defaultDiscountPercent,
+  defaultReferralPercent,
   canCreateDummy,
   defaultAccountId,
   fixedManager,
@@ -45,6 +46,7 @@ export function OrderForm({
   initialPlatformFee: string;
   dummyPayoutPercent: string;
   defaultDiscountPercent: string;
+  defaultReferralPercent: string;
   canCreateDummy: boolean;
   defaultAccountId?: string;
   fixedManager?: ManagerOption | null;
@@ -57,25 +59,33 @@ export function OrderForm({
   const [serviceFeeText, setServiceFeeText] = useState("0.00");
   const [discountText, setDiscountText] = useState(defaultDiscountPercent);
   const [platformFeeText, setPlatformFeeText] = useState(initialPlatformFee);
+  const [hasReferral, setHasReferral] = useState(false);
+  const [referralPercentText, setReferralPercentText] = useState(defaultReferralPercent);
+  const [referralClient, setReferralClient] = useState("");
+  const [referralSource, setReferralSource] = useState("");
+  const [referralLink, setReferralLink] = useState("");
   const [managerId, setManagerId] = useState(fixedManager?.id ?? "");
   const availableManagers = useMemo(() => managers.filter((manager) => (manager.assigned_account_ids ?? [manager.account_id]).includes(accountId)), [accountId, managers]);
   const amount = toMinorUnits(amountText);
   const serviceFee = toMinorUnits(serviceFeeText);
   const discount = asBasisPoints(discountText);
   const platformFee = asBasisPoints(platformFeeText);
-  const validPreview = amount !== null && serviceFee !== null && discount !== null && platformFee !== null && discount <= 10_000n && platformFee <= 10_000n;
+  const referralPercent = asBasisPoints(referralPercentText);
+  const validPreview = amount !== null && serviceFee !== null && discount !== null && platformFee !== null && referralPercent !== null && discount <= 10_000n && platformFee <= 10_000n && referralPercent <= 10_000n;
+  const referralGross = validPreview && hasReferral && amount !== null && referralPercent !== null ? roundRatio(amount * referralPercent, 10_000n) : 0n;
+  const referralNet = platformFee !== null ? referralGross - roundRatio(referralGross * platformFee, 10_000n) : referralGross;
   const preview = validPreview && amount !== null && serviceFee !== null && discount !== null && platformFee !== null
     ? orderType === "real"
       ? {
           buyerPaid: amount + serviceFee,
           platformFee: roundRatio(amount * platformFee, 10_000n),
-          sellerReceives: amount - roundRatio(amount * platformFee, 10_000n),
-          profitLoss: amount - roundRatio(amount * platformFee, 10_000n),
+          sellerReceives: amount - roundRatio(amount * platformFee, 10_000n) + referralNet,
+          profitLoss: amount - roundRatio(amount * platformFee, 10_000n) + referralNet,
         }
       : (() => {
           const buyerPaid = roundRatio((amount + serviceFee) * (10_000n - discount), 10_000n);
           const payout = asBasisPoints(dummyPayoutPercent) ?? 8_000n;
-          const sellerReceives = roundRatio(amount * payout, 10_000n);
+          const sellerReceives = roundRatio(amount * payout, 10_000n) + referralNet;
           const loss = buyerPaid > sellerReceives ? buyerPaid - sellerReceives : 0n;
           return { buyerPaid, platformFee: 0n, sellerReceives, profitLoss: -loss };
         })()
@@ -97,6 +107,8 @@ export function OrderForm({
         <label className={labelClass}>Order amount ($)<input name="amount" type="number" inputMode="decimal" min="0.01" step="0.01" required value={amountText} onChange={(event) => setAmountText(event.target.value)} className={fieldClass} placeholder="0.00" /></label>
         <label className={labelClass}>Service fee ($)<input name="serviceFee" type="number" inputMode="decimal" min="0" step="0.01" required value={serviceFeeText} onChange={(event) => setServiceFeeText(event.target.value)} className={fieldClass} placeholder="0.00" /></label>
 
+        <fieldset className="sm:col-span-2 rounded-xl border border-[#e9eaf2] p-4"><legend className={labelClass}>Referral</legend><label className="flex items-center gap-2 text-xs font-medium text-[#555a6e]"><input type="checkbox" name="hasReferral" value="true" checked={hasReferral} onChange={(event) => setHasReferral(event.target.checked)} className="h-4 w-4 accent-[#7057ed]" /> This order came from a client referral</label>{hasReferral && <div className="mt-4 grid gap-4 sm:grid-cols-2"><label className={labelClass}>Referral source client<input name="referralSourceClient" required maxLength={120} value={referralSource} onChange={(event) => setReferralSource(event.target.value)} className={fieldClass} placeholder="Who referred this client?" /></label><label className={labelClass}>Client receiving referral<input name="referralClientName" required maxLength={120} value={referralClient} onChange={(event) => setReferralClient(event.target.value)} className={fieldClass} placeholder="Client for this order" /></label><label className={labelClass}>Referral percentage<input name="referralPercent" type="number" required min="0" max="100" step="0.01" value={referralPercentText} onChange={(event) => setReferralPercentText(event.target.value)} className={fieldClass} /></label><label className={labelClass}>Referral link · optional<input name="referralLink" type="url" maxLength={500} value={referralLink} onChange={(event) => setReferralLink(event.target.value)} className={fieldClass} placeholder="https://…" /></label></div>}</fieldset>
+
         {orderType === "real" ? <label className={labelClass}>Platform fee (%)<input name="platformFeePercent" type="number" inputMode="decimal" min="0" max="100" step="0.01" required value={platformFeeText} onChange={(event) => setPlatformFeeText(event.target.value)} className={fieldClass} /></label> : <label className={labelClass}>Discount (%)<input name="discountPercent" type="number" inputMode="decimal" min="0" max="100" step="0.01" required value={discountText} onChange={(event) => setDiscountText(event.target.value)} className={fieldClass} /></label>}
 
         {fixedManager ? <label className={labelClass}>Sales manager<input type="hidden" name="managerId" value={fixedManager.id} /><select aria-label="Assigned sales manager" value={fixedManager.id} disabled className={`${fieldClass} cursor-not-allowed bg-[#f1f2f6] text-[#74788a]`}><option value={fixedManager.id}>{fixedManager.name}</option></select><span className="mt-1 block text-[10px] font-normal text-[#999cac]">Automatically assigned to your account.</span></label> : <label className={labelClass}>Sales manager <span className="font-normal text-[#a0a3b1]">· optional</span><select name="managerId" value={managerId} onChange={(event) => setManagerId(event.target.value)} className={fieldClass}><option value="">Unassigned</option>{availableManagers.map((manager) => <option key={manager.id} value={manager.id}>{manager.name}</option>)}</select></label>}
@@ -116,6 +128,7 @@ export function OrderForm({
       <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-[13px] bg-white/10 text-[#c2b8ff]"><CircleDollarSign size={18} /></span><div><p className="text-[10px] font-semibold tracking-[.15em] text-[#aaa5c2] uppercase">Live preview</p><p className="mt-0.5 text-sm font-semibold">{orderType === "real" ? "Real order totals" : "Dummy order totals"}</p></div></div>
       <div className="mt-6 rounded-[16px] border border-white/10 bg-white/[.045] p-4"><p className="text-[10px] text-[#aaa5c2]">Buyer pays</p><p className="mt-1 text-[28px] font-semibold tracking-[-.045em]">{preview ? asMoney(preview.buyerPaid) : "—"}</p></div>
       <div className="mt-4 space-y-3.5">
+        {hasReferral && <><PreviewRow label="Referral gross" value={asMoney(referralGross)} /><PreviewRow label="Referral net" value={asMoney(referralNet)} /></>}
         <PreviewRow label={orderType === "real" ? "Platform fee" : "Discount"} value={orderType === "real" ? (preview ? asMoney(preview.platformFee) : "—") : `${discountText || "0"}%`} />
         <PreviewRow label="Seller receives" value={preview ? asMoney(preview.sellerReceives) : "—"} />
         <div className="border-t border-white/10 pt-3.5"><PreviewRow label={orderType === "real" ? "Net revenue" : "Profit / loss"} value={preview ? asMoney(preview.profitLoss < 0n ? -preview.profitLoss : preview.profitLoss) : "—"} tone={orderType === "dummy" && preview?.profitLoss && preview.profitLoss < 0n ? "red" : "green"} /></div>

@@ -22,7 +22,7 @@ async function NewOrderContent({ searchParams }: { searchParams: Promise<{ accou
   const [accountsResult, managersResult, settingsResult, assignedAccountsResult] = await Promise.all([
     supabase.from("accounts").select("id, name").eq("active", true).order("name"),
     supabase.from("sales_managers").select("id, name, account_id, profile_id").eq("active", true).order("name"),
-    supabase.from("app_settings").select("real_fee_percent, dummy_payout_percent, default_discount_percent").eq("id", 1).single(),
+    supabase.from("app_settings").select("real_fee_percent, dummy_payout_percent, default_discount_percent, default_referral_percent").eq("id", 1).single(),
     supabase.from("sales_manager_accounts").select("account_id, manager_id"),
   ]);
 
@@ -53,6 +53,7 @@ async function NewOrderContent({ searchParams }: { searchParams: Promise<{ accou
         initialPlatformFee={String(settingsResult.data.real_fee_percent)}
         dummyPayoutPercent={String(settingsResult.data.dummy_payout_percent)}
         defaultDiscountPercent={String(settingsResult.data.default_discount_percent)}
+        defaultReferralPercent={String(settingsResult.data.default_referral_percent)}
         canCreateDummy={profile.role === "admin" || Boolean(managerPermissionResult?.data)}
         defaultAccountId={typeof query.accountId === "string" ? query.accountId : undefined}
         fixedManager={fixedManager}

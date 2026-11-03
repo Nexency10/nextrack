@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Activity, BadgeDollarSign, ChartNoAxesCombined, Layers3, LockKeyhole, ReceiptText } from "lucide-react";
+import { Activity, BadgeDollarSign, ChartNoAxesCombined, Layers3, LockKeyhole, ReceiptText, Share2 } from "lucide-react";
+import { formatCents, toCents } from "@/lib/accounts/money";
 
-type AccountOrder = { id: string; orderDate: string; platform: string; orderType: "real" | "dummy"; amount: string; status: string };
+type AccountOrder = { id: string; orderDate: string; platform: string; orderType: "real" | "dummy"; amount: string; status: string; hasReferral: boolean; referralPercent: string; referralGross: string; referralNet: string; referralClient: string; referralSource: string; referralLink: string };
 type PlatformMetric = { platform: string; realOrders: number; dummyOrders: number | null; totalOrders: number | null; sales: string; netRevenue: string };
 
 export function AccountDetails({
@@ -28,7 +29,8 @@ export function AccountDetails({
   canManage: boolean;
   isAdmin: boolean;
 }) {
-  const [tab, setTab] = useState<"overview" | "orders" | "platforms">(isAdmin ? "overview" : "orders");
+  const [tab, setTab] = useState<"overview" | "orders" | "platforms" | "referrals">(isAdmin ? "overview" : "orders");
+  const referrals = orders.filter((order) => order.hasReferral);
   return <div className="min-h-full text-[#191b2b]">
     <div className="mx-auto max-w-[1280px] px-5 py-8 sm:px-8 sm:py-10 lg:px-10">
       <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
@@ -36,7 +38,7 @@ export function AccountDetails({
         {canManage && <Link href={`/orders/new?accountId=${account.id}`} className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#7057ed] px-3.5 text-[11px] font-semibold text-white transition hover:bg-[#6249df]"><ReceiptText size={14} /> Add order</Link>}
       </div>
 
-      <div className="mb-5 flex w-fit gap-1 rounded-[14px] border border-[#e7e8ef] bg-white p-1.5">{(isAdmin ? ["overview", "orders", "platforms"] as const : ["orders"] as const).map((value) => <button key={value} type="button" onClick={() => setTab(value)} className={`rounded-[10px] px-3.5 py-2 text-[10px] font-semibold capitalize transition ${tab === value ? "bg-[#f1efff] text-[#6753d5]" : "text-[#808497] hover:text-[#4e5367]"}`}>{value === "platforms" ? "Platform breakdown" : value}</button>)}</div>
+      <div className="mb-5 flex w-fit gap-1 rounded-[14px] border border-[#e7e8ef] bg-white p-1.5">{(isAdmin ? ["overview", "orders", "platforms", "referrals"] as const : ["orders", "referrals"] as const).map((value) => <button key={value} type="button" onClick={() => setTab(value)} className={`rounded-[10px] px-3.5 py-2 text-[10px] font-semibold capitalize transition ${tab === value ? "bg-[#f1efff] text-[#6753d5]" : "text-[#808497] hover:text-[#4e5367]"}`}>{value === "platforms" ? "Platform breakdown" : value}</button>)}</div>
       {isAdmin && tab === "overview" && <section className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
         <MetricCard label="Real sales" value={realSales} icon={<BadgeDollarSign size={17} />} tone="violet" />
         <MetricCard label="Net revenue" value={netRevenue} icon={<ChartNoAxesCombined size={17} />} tone="green" />
@@ -60,6 +62,7 @@ export function AccountDetails({
           <tbody className="divide-y divide-[#f0f1f5]">{platforms.length ? platforms.map((row) => <tr key={row.platform} className="hover:bg-[#fcfcff]"><td className="px-5 py-4 text-xs font-semibold text-[#34374a]">{row.platform}</td><td className="px-4 py-4 text-xs text-[#62677a]">{row.realOrders.toLocaleString()}</td><td className="px-4 py-4 text-xs text-[#62677a]">{row.dummyOrders === null ? <span className="text-[#a1a4b2">Admin only</span> : row.dummyOrders.toLocaleString()}</td><td className="px-4 py-4 text-xs font-semibold text-[#44485c]">{row.totalOrders === null ? <span className="text-[#a1a4b2">Admin only</span> : row.totalOrders.toLocaleString()}</td><td className="px-4 py-4 text-xs font-semibold text-[#34374a]">{row.sales}</td><td className="px-5 py-4 text-xs font-semibold text-[#23956f]">{row.netRevenue}</td></tr>) : <tr><td colSpan={6} className="px-5 py-14 text-center text-xs text-[#9296a7]">No active order volume by platform yet.</td></tr>}</tbody>
         </table></div>
       </section>}
+      {tab === "referrals" && <section className="overflow-hidden rounded-[20px] border border-[#e8eaf1] bg-white shadow-[0_12px_40px_rgba(37,39,76,.04)]"><div className="flex items-center gap-3 border-b border-[#eceef4] px-5 py-5 sm:px-6"><span className="grid h-9 w-9 place-items-center rounded-[12px] bg-[#f1efff] text-[#7057ed]"><Share2 size={16} /></span><div><h2 className="text-sm font-semibold">Referral history</h2><p className="mt-1 text-[10px] text-[#969aab]">{referrals.length} referral {referrals.length === 1 ? "use" : "uses"} for this account</p></div><Link href="/referrals" className="ml-auto text-[10px] font-semibold text-[#7057ed] hover:underline">Open ledger</Link></div><div className="grid gap-3 p-5 sm:grid-cols-3"><MiniMetric label="Referral uses" value={referrals.length.toString()} /><MiniMetric label="Gross referral" value={formatCents(referrals.reduce((sum, row) => sum + toCents(row.referralGross), 0n))} /><MiniMetric label="Net referral" value={formatCents(referrals.reduce((sum, row) => sum + toCents(row.referralNet), 0n))} /></div><div className="overflow-x-auto"><table className="w-full min-w-[750px] text-left"><thead className="bg-[#fafbfe] text-[9px] font-semibold tracking-[.1em] text-[#979bad] uppercase"><tr>{["Date", "Platform", "Source client", "Used for", "Gross", "Net", "Link"].map((h) => <th key={h} className="px-5 py-3.5">{h}</th>)}</tr></thead><tbody className="divide-y divide-[#f0f1f5]">{referrals.map((order) => <tr key={order.id}><td className="px-5 py-3.5 text-[11px]">{formatDate(order.orderDate)}</td><td className="px-5 py-3.5 text-[11px]">{order.platform}</td><td className="px-5 py-3.5 text-[11px] font-medium">{order.referralSource}</td><td className="px-5 py-3.5 text-[11px]">{order.referralClient}</td><td className="px-5 py-3.5 text-[11px]">{formatCents(toCents(order.referralGross))}</td><td className="px-5 py-3.5 text-[11px] font-semibold text-emerald-700">{formatCents(toCents(order.referralNet))}</td><td className="px-5 py-3.5 text-[11px]">{order.referralLink ? <a href={order.referralLink} target="_blank" rel="noopener noreferrer" className="text-[#7057ed] hover:underline">Open</a> : "—"}</td></tr>)}{!referrals.length && <tr><td colSpan={7} className="px-5 py-12 text-center text-xs text-[#9296a7]">No referrals recorded for this account.</td></tr>}</tbody></table></div></section>}
       <p className="mt-5 flex items-center gap-2 text-[10px] leading-5 text-[#9a9eae]"><Layers3 size={13} /> Dummy order records are protected by workspace access rules.</p>
     </div>
   </div>;
@@ -78,4 +81,6 @@ function StatusBadge({ status }: { status: string }) {
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${value}T00:00:00Z`));
 }
+
+function MiniMetric({ label, value }: { label: string; value: string }) { return <div className="rounded-xl bg-[#f8f8fc] p-3"><p className="text-[10px] text-[#85899d]">{label}</p><p className="mt-1 text-sm font-semibold text-[#34374a]">{value}</p></div>; }
 

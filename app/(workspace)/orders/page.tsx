@@ -16,13 +16,21 @@ type OrderRow = {
   manager_id: string | null;
   status: string;
   notes: string;
+  has_referral: boolean;
+  referral_percent: number | string;
+  referral_gross: number | string;
+  referral_net: number | string;
+  referral_client_name: string;
+  referral_source_client: string;
+  referral_link: string;
 };
 
-export default function OrdersPage() {
-  return <Suspense fallback={<PageLoader />}><OrdersContent /></Suspense>;
+export default function OrdersPage({ searchParams }: PageProps<"/orders">) {
+  return <Suspense fallback={<PageLoader />}><OrdersContent searchParams={searchParams} /></Suspense>;
 }
 
-async function OrdersContent() {
+async function OrdersContent({ searchParams }: { searchParams: Promise<{ edit?: string }> }) {
+  const query = await searchParams;
   const supabase = await createRequestClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/");
@@ -30,7 +38,7 @@ async function OrdersContent() {
   if (profile?.status !== "active") redirect("/dashboard");
 
   const [ordersResult, accountsResult, managersResult] = await Promise.all([
-    supabase.from("orders").select("id, order_date, account_id, platform, order_type, amount, buyer_paid, seller_receives, manager_id, status, notes").order("order_date", { ascending: false }).order("created_at", { ascending: false }),
+    supabase.from("orders").select("id, order_date, account_id, platform, order_type, amount, buyer_paid, seller_receives, manager_id, status, notes, has_referral, referral_percent, referral_gross, referral_net, referral_client_name, referral_source_client, referral_link").order("order_date", { ascending: false }).order("created_at", { ascending: false }),
     supabase.from("accounts").select("id, name").order("name"),
     supabase.from("sales_managers").select("id, name"),
   ]);
@@ -53,9 +61,16 @@ async function OrdersContent() {
     manager: order.manager_id ? managers.get(order.manager_id) ?? "Unassigned" : "Unassigned",
     status: order.status,
     notes: order.notes,
+    hasReferral: order.has_referral,
+    referralPercent: String(order.referral_percent),
+    referralGross: String(order.referral_gross),
+    referralNet: String(order.referral_net),
+    referralClient: order.referral_client_name,
+    referralSource: order.referral_source_client,
+    referralLink: order.referral_link,
   }));
 
-  return <OrdersWorkspace orders={orders} accounts={[...accounts].map(([id, name]) => ({ id, name }))} isAdmin={profile.role === "admin"} canManage={["admin", "manager"].includes(profile.role)} />;
+  return <OrdersWorkspace orders={orders} accounts={[...accounts].map(([id, name]) => ({ id, name }))} isAdmin={profile.role === "admin"} canManage={["admin", "manager"].includes(profile.role)} initialEditId={query.edit} />;
 }
 
 function OrdersDataError({ message }: { message: string }) {

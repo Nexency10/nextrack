@@ -13,6 +13,13 @@ type OrderRow = {
   amount: number | string;
   seller_receives: number | string;
   status: string;
+  has_referral: boolean;
+  referral_percent: number | string;
+  referral_gross: number | string;
+  referral_net: number | string;
+  referral_client_name: string;
+  referral_source_client: string;
+  referral_link: string;
 };
 
 export default function AccountDetailsPage({ params }: PageProps<"/accounts/[id]">) {
@@ -30,7 +37,7 @@ async function AccountDetailsContent({ params }: { params: Promise<{ id: string 
 
   const [accountResult, ordersResult] = await Promise.all([
     supabase.from("accounts").select("id, name, active").eq("id", id).maybeSingle(),
-    supabase.from("orders").select("id, order_date, platform, order_type, amount, seller_receives, status").eq("account_id", id).order("order_date", { ascending: false }),
+    supabase.from("orders").select("id, order_date, platform, order_type, amount, seller_receives, status, has_referral, referral_percent, referral_gross, referral_net, referral_client_name, referral_source_client, referral_link").eq("account_id", id).order("order_date", { ascending: false }),
   ]);
   if (accountResult.error || ordersResult.error) return <DetailsError />;
   if (!accountResult.data) notFound();
@@ -55,7 +62,7 @@ async function AccountDetailsContent({ params }: { params: Promise<{ id: string 
 
   return <AccountDetails
     account={accountResult.data}
-    orders={orderRows.map((order) => ({ id: order.id, orderDate: order.order_date, platform: order.platform, orderType: order.order_type, amount: formatCents(toCents(order.amount)), status: order.status }))}
+    orders={orderRows.map((order) => ({ id: order.id, orderDate: order.order_date, platform: order.platform, orderType: order.order_type, amount: formatCents(toCents(order.amount)), status: order.status, hasReferral: order.has_referral, referralPercent: String(order.referral_percent), referralGross: String(order.referral_gross), referralNet: String(order.referral_net), referralClient: order.referral_client_name, referralSource: order.referral_source_client, referralLink: order.referral_link }))}
     platforms={platforms}
     realSales={isAdmin ? formatCents(realOrders.reduce((total, order) => total + toCents(order.amount), 0n)) : ""}
     netRevenue={isAdmin ? formatCents(realOrders.reduce((total, order) => total + toCents(order.seller_receives), 0n)) : ""}

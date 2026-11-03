@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Building2, FilePlus2, LayoutDashboard, Layers3, LockKeyhole, LogOut, Menu, ReceiptText, Settings2, ShieldCheck, Users, WalletCards, X } from "lucide-react";
+import { BarChart3, Building2, FilePlus2, LayoutDashboard, Layers3, LockKeyhole, LogOut, Menu, ReceiptText, Settings2, ShieldCheck, Users, WalletCards, X, Share2 } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
 import { DashboardActions } from "@/components/dashboard/dashboard-actions";
 
@@ -22,12 +22,13 @@ export function WorkspaceShell({ children, name, role, email }: { children: Reac
     { label: "Salary", href: "/salary", icon: <WalletCards size={17} />, admin: true },
     { label: "Sales managers", href: "/sales-managers", icon: <Users size={17} /> },
     { label: "Reports", href: "/reports", icon: <BarChart3 size={17} />, admin: true },
+    { label: "Referral ledger", href: "/referrals", icon: <Share2 size={17} /> },
     { label: "Private finance", href: "/private-finance", icon: <LockKeyhole size={17} />, admin: true },
     { label: "Settings", href: "/settings", icon: <Settings2 size={17} />, admin: true },
     { label: "Team access", href: "/admin/users", icon: <ShieldCheck size={17} />, admin: true },
   ];
   const visibleItems = items.filter((item) => (!item.admin || isAdmin) && (!item.manager || isAdmin || role === "manager"));
-  const pageTitle = pathname === "/dashboard" ? "Dashboard" : pathname.startsWith("/accounts/") ? "Account details" : pathname === "/accounts" ? "Accounts" : pathname === "/orders" ? "Orders" : pathname.startsWith("/orders") ? "Add order" : pathname === "/sales-managers" ? "Sales managers" : pathname === "/reports" ? "Reports" : pathname === "/private-finance" ? "Private finance" : pathname === "/salary" ? "Salary" : pathname === "/settings" ? "Settings" : pathname.startsWith("/admin") ? "Team access" : "Workspace";
+  const pageTitle = pathname === "/dashboard" ? "Dashboard" : pathname === "/referrals" ? "Referral ledger" : pathname.startsWith("/accounts/") ? "Account details" : pathname === "/accounts" ? "Accounts" : pathname === "/orders" ? "Orders" : pathname.startsWith("/orders") ? "Add order" : pathname === "/sales-managers" ? "Sales managers" : pathname === "/reports" ? "Reports" : pathname === "/private-finance" ? "Private finance" : pathname === "/salary" ? "Salary" : pathname === "/settings" ? "Settings" : pathname.startsWith("/admin") ? "Team access" : "Workspace";
   useEffect(() => {
     if (!open) return;
     const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };

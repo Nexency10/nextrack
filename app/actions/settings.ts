@@ -23,7 +23,8 @@ export async function saveWorkspaceSettings(_previousState: SettingsActionState,
   const realFee = parsePercent(formData.get("realFeePercent"));
   const dummyPayout = parsePercent(formData.get("dummyPayoutPercent"));
   const defaultDiscount = parsePercent(formData.get("defaultDiscountPercent"));
-  if (realFee === null || dummyPayout === null || defaultDiscount === null) {
+  const defaultReferral = parsePercent(formData.get("defaultReferralPercent"));
+  if (realFee === null || dummyPayout === null || defaultDiscount === null || defaultReferral === null) {
     return { error: "Enter valid percentages between 0 and 100, with up to two decimal places." };
   }
 
@@ -31,6 +32,7 @@ export async function saveWorkspaceSettings(_previousState: SettingsActionState,
     real_fee_percent: realFee,
     dummy_payout_percent: dummyPayout,
     default_discount_percent: defaultDiscount,
+    default_referral_percent: defaultReferral,
   }).eq("id", 1).select("id").maybeSingle();
   if (error) return { error: error.message };
   if (!data) return { error: "Workspace settings were not found. Apply the Supabase setup SQL first." };

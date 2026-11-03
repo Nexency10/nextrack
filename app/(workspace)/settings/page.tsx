@@ -16,7 +16,7 @@ async function SettingsContent() {
   if (profile?.role !== "admin" || profile.status !== "active") redirect("/dashboard");
 
   const { data: settings, error } = await supabase.from("app_settings")
-    .select("real_fee_percent, dummy_payout_percent, default_discount_percent")
+    .select("real_fee_percent, dummy_payout_percent, default_discount_percent, default_referral_percent")
     .eq("id", 1)
     .maybeSingle();
 
@@ -25,6 +25,7 @@ async function SettingsContent() {
       realFeePercent: String(settings.real_fee_percent),
       dummyPayoutPercent: String(settings.dummy_payout_percent),
       defaultDiscountPercent: String(settings.default_discount_percent),
+      defaultReferralPercent: String(settings.default_referral_percent),
     } : null}
     error={error?.message ?? null}
   />;

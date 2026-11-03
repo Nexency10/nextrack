@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tracking Hub – Client Referral Ledger</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root{
+  --bg:#f6f8fc;--panel:#fff;--text:#172033;--muted:#6f7a90;--line:#e5e9f2;
+  --nav:#0f172a;--purple:#6d4aff;--purple2:#8b6cff;--green:#22b573;--red:#ff5b5b;
+  --blue:#3d8bfd;--amber:#f7b73b;--shadow:0 8px 24px rgba(30,42,70,.07)
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+button,input,select{font:inherit}
+.app{display:flex;min-height:100vh}
+.sidebar{width:225px;background:linear-gradient(180deg,#10182b,#0b1222);color:#fff;padding:20px 13px;position:fixed;inset:0 auto 0 0;z-index:10}
+.brand{font-size:22px;font-weight:800;margin:0 10px 22px;display:flex;gap:10px;align-items:center}
+.brand-badge{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#7a5cff,#a855f7)}
+.nav a{display:flex;gap:10px;align-items:center;color:#dbe3f2;text-decoration:none;padding:12px 14px;border-radius:10px;margin-bottom:6px;cursor:pointer}
+.nav a.active,.nav a:hover{background:linear-gradient(90deg,rgba(109,74,255,.38),rgba(109,74,255,.18));color:#fff}
+.userbox{position:absolute;bottom:20px;left:15px;right:15px;padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:rgba(255,255,255,.04)}
+.main{margin-left:225px;width:calc(100% - 225px);padding:22px}
+.topbar{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:20px}
+.title h1{margin:0;font-size:28px}.title p{margin:4px 0 0;color:var(--muted)}
+.top-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.pill,.btn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 12px}
+.btn{cursor:pointer}.btn.primary{background:var(--purple);color:white;border-color:var(--purple)}.btn.red{background:#fff0f0;color:#c84040}.btn.green{background:#ecfbf3;color:#127b4d}
+.grid{display:grid;gap:14px}.kpis{grid-template-columns:repeat(4,1fr)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:var(--shadow)}
+.kpi-label{color:var(--muted);font-size:13px}.kpi-value{font-size:28px;font-weight:800;margin-top:5px}.kpi-sub{font-size:12px;color:var(--muted);margin-top:5px}
+.green{color:var(--green)}.redtxt{color:var(--red)}.purple{color:var(--purple)}
+.screen{display:none}.screen.active{display:block}
+.layout2{grid-template-columns:1.2fr .8fr}.layout3{grid-template-columns:repeat(3,1fr)}
+.panel-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.panel-title h3{margin:0;font-size:17px}
+.chart-wrap{height:250px}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:11px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}th{font-size:12px;color:var(--muted);font-weight:700;background:#fafbfe}
+.table-wrap{overflow-x:auto}.tag{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:700}.tag.real{background:#eaf8f1;color:#14824f}.tag.dummy{background:#fff0f0;color:#d14343}.tag.active{background:#edf8ff;color:#2467d1}
+.form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}label{font-size:12px;color:var(--muted)}input,select{width:100%;margin-top:6px;border:1px solid var(--line);padding:10px;border-radius:9px;background:#fff}
+.calc{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-top:14px}.mini{background:#f8f9fc;border:1px solid var(--line);padding:12px;border-radius:10px}.mini small{color:var(--muted)}.mini strong{display:block;font-size:18px;margin-top:5px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.tab{padding:9px 12px;border:1px solid var(--line);background:#fff;border-radius:10px;cursor:pointer}.tab.active{background:var(--purple);color:#fff;border-color:var(--purple)}
+.subscreen{display:none}.subscreen.active{display:block}
+.progress{height:9px;background:#edf0f6;border-radius:999px;overflow:hidden}.progress span{display:block;height:100%;background:linear-gradient(90deg,var(--purple),var(--purple2))}
+.lockbox{text-align:center;padding:38px}.lockicon{font-size:48px}.muted{color:var(--muted)}.hidden-metric{letter-spacing:3px}
+.statline{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px dashed var(--line)}.statline:last-child{border-bottom:0}
+.notice{padding:12px;border-radius:10px;background:#f4f1ff;color:#4b3bb3;font-size:13px}
+.toast{position:fixed;right:20px;bottom:20px;background:#111827;color:#fff;padding:12px 16px;border-radius:10px;opacity:0;transform:translateY(12px);transition:.2s;pointer-events:none;z-index:99}
+.toast.show{opacity:1;transform:translateY(0)}
+.modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:50}.modal.show{display:flex}.modal-card{width:min(560px,92vw);background:#fff;border-radius:16px;padding:18px;box-shadow:var(--shadow)}
+.row-actions{display:flex;gap:6px}
+@media(max-width:1100px){.kpis{grid-template-columns:repeat(2,1fr)}.layout2,.layout3{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr 1fr}.calc{grid-template-columns:1fr 1fr}}
+@media(max-width:760px){.sidebar{display:none}.main{margin-left:0;width:100%}.kpis,.form-grid,.calc{grid-template-columns:1fr}.topbar{flex-direction:column;align-items:flex-start}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand"><span class="brand-badge"></span>Tracking Hub</div>
+  <nav class="nav" id="sideNav">
+    <a class="active" data-screen="dashboard">⌂ Dashboard</a>
+    <a data-screen="addOrder">＋ Add Order</a>
+    <a data-screen="orders">☷ Orders</a>
+    <a data-screen="accounts">◉ Accounts</a>
+    <a data-screen="managers">♙ Sales Managers</a>
+    <a data-screen="reports">▥ Reports</a>
+    <a data-screen="referrals">↗ Referral Ledger</a>
+    <a data-screen="private">🔒 Private Finance</a>
+    <a data-screen="settings">⚙ Settings</a>
+  </nav>
+  <div class="userbox">
+    <div style="font-weight:700">Mahin</div>
+    <div style="font-size:12px;color:#9ca8bf">Administrator</div>
+  </div>
+</aside>
+
+<main class="main">
+
+<section id="dashboard" class="screen active">
+  <div class="topbar">
+    <div class="title"><h1>Dashboard</h1><p>Overview of real sales and account performance.</p></div>
+    <div class="top-actions">
+      <button class="btn" onclick="exportCSV()">Export CSV</button>
+      <button class="btn" onclick="window.print()">Print</button>
+    </div>
+  </div>
+  <div class="grid kpis" id="dashboardKpis"></div>
+  <div class="grid layout2" style="margin-top:14px">
+    <div class="card"><div class="panel-title"><h3>Sales by Platform</h3><span class="pill">Real orders</span></div><div class="chart-wrap"><canvas id="platformChart"></canvas></div></div>
+    <div class="card"><div class="panel-title"><h3>Sales by Account</h3><span class="pill">Real orders</span></div><div class="chart-wrap"><canvas id="accountChart"></canvas></div></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <div class="panel-title"><h3>Account Summary</h3><button class="btn" onclick="go('accounts')">View All</button></div>
+    <div class="table-wrap"><table><thead><tr><th>Account</th><th>Real Orders</th><th>Total Sales</th><th>Net Revenue</th><th>Action</th></tr></thead><tbody id="dashAccountRows"></tbody></table></div>
+  </div>
+</section>
+
+<section id="addOrder" class="screen">
+  <div class="topbar"><div class="title"><h1>Add New Order</h1><p>Calculations are automatic from your saved rules.</p></div></div>
+  <div class="card">
+    <div class="form-grid">
+      <label>Account<select id="orderAccount"></select></label>
+      <label>Platform<select id="orderPlatform"><option>Wix</option><option>Squarespace</option><option>WordPress</option><option>Shopify</option><option>Webflow</option></select></label>
+      <label>Order Type<select id="orderType" onchange="calculateOrderPreview()"><option value="real">Real</option><option value="dummy">Dummy</option></select></label>
+      <label>Order Amount ($)<input id="orderAmount" type="number" step="0.01" value="350" oninput="calculateOrderPreview()"></label>
+      <label>Service Fee ($)<input id="orderService" type="number" step="0.01" value="0" oninput="calculateOrderPreview()"></label>
+      <label>Discount (%)<input id="orderDiscount" type="number" step="0.01" value="0" oninput="calculateOrderPreview()"></label>
+      <label>Referral?<select id="orderReferral" onchange="toggleReferral();calculateOrderPreview()"><option value="no">No</option><option value="yes">Yes</option></select></label>
+      <label id="referralPercentWrap">Referral (%)<input id="orderReferralPercent" type="number" step="0.01" value="10" oninput="calculateOrderPreview()"></label>
+      <label class="referral-detail">Current Client / Buyer<input id="orderClientName" placeholder="Client this order belongs to"></label>
+      <label class="referral-detail">Referral Source Client<input id="orderReferralSource" placeholder="Client who generated this referral"></label>
+      <label class="referral-detail" style="grid-column:span 2">Referral Link (optional)<input id="orderReferralLink" placeholder="https://..."></label>
+      <label>Platform Fee (%)<input id="orderPlatformFee" type="number" step="0.01" value="20" oninput="calculateOrderPreview()"></label>
+      <label>Sales Manager<select id="orderManager"></select></label>
+      <label>Date<input id="orderDate" type="date"></label>
+      <label>Status<select id="orderStatus"><option>Completed</option><option>Pending</option><option>Cancelled</option></select></label>
+      <label style="grid-column:span 2">Notes<input id="orderNotes" placeholder="Optional notes"></label>
+    </div>
+    <div class="calc">
+      <div class="mini"><small>Discount</small><strong id="discountOut">$0.00</strong></div>
+      <div class="mini"><small>Buyer Paid</small><strong id="buyerPaid">$350.00</strong></div>
+      <div class="mini"><small>Referral Gross</small><strong id="referralGrossOut">$0.00</strong></div>
+      <div class="mini"><small>Referral Net</small><strong id="referralNetOut">$0.00</strong></div>
+      <div class="mini"><small>Platform Fee</small><strong id="feeOut">$70.00</strong></div>
+      <div class="mini"><small>Seller Receives</small><strong id="sellerReceives">$280.00</strong></div>
+      <div class="mini"><small>Profit / Loss</small><strong id="profitLoss">$280.00</strong></div>
+    </div>
+    <div class="notice" style="margin-top:14px">Dummy loss stays hidden from normal dashboard screens and appears only in Private Finance.</div>
+    <button class="btn primary" style="margin-top:12px" onclick="saveOrder()">Save Order</button>
+  </div>
+</section>
+
+<section id="orders" class="screen">
+  <div class="topbar"><div class="title"><h1>Orders</h1><p>Search, filter, edit and delete orders.</p></div><button class="btn primary" onclick="go('addOrder')">+ Add Order</button></div>
+  <div class="card">
+    <div class="form-grid" style="grid-template-columns:repeat(4,1fr)">
+      <label>Account<select id="filterAccount" onchange="renderOrders()"><option value="">All Accounts</option></select></label>
+      <label>Platform<select id="filterPlatform" onchange="renderOrders()"><option value="">All Platforms</option><option>Wix</option><option>Squarespace</option><option>WordPress</option><option>Shopify</option><option>Webflow</option></select></label>
+      <label>Order Type<select id="filterType" onchange="renderOrders()"><option value="">All Types</option><option value="real">Real</option><option value="dummy">Dummy</option></select></label>
+      <label>Search<input id="filterSearch" placeholder="Search..." oninput="renderOrders()"></label>
+    </div>
+    <div class="table-wrap" style="margin-top:14px">
+      <table><thead><tr><th>Date</th><th>Account</th><th>Platform</th><th>Type</th><th>Order</th><th>Buyer Paid</th><th>Referral</th><th>Seller Receives</th><th>Manager</th><th>Status</th><th>Action</th></tr></thead><tbody id="ordersRows"></tbody></table>
+    </div>
+  </div>
+</section>
+
+<section id="accounts" class="screen">
+  <div class="topbar"><div class="title"><h1>Accounts</h1><p>Compare every account by platform, real sales and order volume.</p></div><button class="btn primary" onclick="openAccountModal()">+ New Account</button></div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="panel-title"><div><h3>Account × Platform Sales Summary</h3><p class="muted" style="margin:4px 0 0">Dummy loss is hidden here and remains available only inside Private Finance.</p></div><span class="pill">Live from saved orders</span></div>
+    <div class="table-wrap">
+      <table><thead><tr><th>Account</th><th>Platform</th><th>Real Orders</th><th>Dummy Orders</th><th>Total Orders</th><th>Real Sales</th><th>Net Revenue</th><th>Action</th></tr></thead><tbody id="accountPlatformRows"></tbody></table>
+    </div>
+  </div>
+  <div class="grid layout3" id="accountCards"></div>
+</section>
+
+<section id="accountDetails" class="screen">
+  <div class="topbar"><div class="title"><h1 id="accountTitle">Account</h1><p>Account-level overview and order history.</p></div><button class="btn" onclick="go('accounts')">← Back</button></div>
+  <div class="tabs">
+    <button class="tab active" onclick="subtab('accOverview',this)">Overview</button>
+    <button class="tab" onclick="subtab('accOrders',this)">Orders</button>
+    <button class="tab" onclick="subtab('accPlatforms',this)">Platform Breakdown</button>
+    <button class="tab" onclick="subtab('accReferrals',this)">Referrals</button>
+  </div>
+  <div id="accOverview" class="subscreen active"></div>
+  <div id="accOrders" class="subscreen"></div>
+  <div id="accPlatforms" class="subscreen"></div>
+  <div id="accReferrals" class="subscreen"></div>
+</section>
+
+<section id="managers" class="screen">
+  <div class="topbar"><div class="title"><h1>Sales Managers</h1><p>Track targets and sales performance.</p></div><button class="btn primary" onclick="openManagerModal()">+ Add Manager</button></div>
+  <div class="grid layout3" id="managerCards"></div>
+</section>
+
+<section id="reports" class="screen">
+  <div class="topbar"><div class="title"><h1>Reports</h1><p>Generate summaries from the stored data.</p></div></div>
+  <div class="grid layout3">
+    <div class="card"><h3>Company Summary</h3><p class="muted">Real sales, net revenue and order counts.</p><button class="btn primary" onclick="generateReport('company')">Generate</button></div>
+    <div class="card"><h3>Account Report</h3><p class="muted">Breakdown by account and platform.</p><button class="btn primary" onclick="generateReport('account')">Generate</button></div>
+    <div class="card"><h3>Manager Report</h3><p class="muted">Sales vs target by manager.</p><button class="btn primary" onclick="generateReport('manager')">Generate</button></div>
+  </div>
+  <div id="reportOutput" class="card" style="margin-top:14px"><h3>Report Output</h3><p class="muted">Choose a report above.</p></div>
+</section>
+
+<section id="referrals" class="screen">
+  <div class="topbar"><div class="title"><h1>Referral Ledger</h1><p>Track exactly which client generated each referral and where it was used.</p></div><button class="btn" onclick="exportReferralCSV()">Export Referral CSV</button></div>
+  <div class="grid kpis" id="referralKpis"></div>
+  <div class="card" style="margin-top:14px">
+    <div class="panel-title"><div><h3>Account Referral Summary</h3><p class="muted" style="margin:4px 0 0">Count and value of referrals used inside each account.</p></div><span class="pill">Auto calculated</span></div>
+    <div class="table-wrap"><table><thead><tr><th>Account</th><th>Referral Uses</th><th>Source Clients</th><th>Gross Referral</th><th>Net Referral</th></tr></thead><tbody id="referralAccountRows"></tbody></table></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <div class="panel-title"><h3>Referral History</h3><div style="display:flex;gap:8px"><select id="referralFilterAccount" onchange="renderReferrals()"><option value="">All Accounts</option></select><input id="referralSearch" placeholder="Search client..." oninput="renderReferrals()" style="max-width:220px"></div></div>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Account</th><th>Platform</th><th>Source Client</th><th>Used For Client</th><th>Order</th><th>Referral %</th><th>Gross</th><th>Net</th><th>Link</th><th>Action</th></tr></thead><tbody id="referralRows"></tbody></table></div>
+  </div>
+</section>
+
+<section id="private" class="screen">
+  <div class="topbar"><div class="title"><h1>Private Finance 🔒</h1><p>Dummy-order investment and loss data.</p></div></div>
+  <div id="lockScreen" class="card lockbox">
+    <div class="lockicon">🔒</div><h2>Restricted Area</h2><p class="muted">Enter your admin PIN.</p>
+    <div style="max-width:320px;margin:16px auto"><input id="pinInput" type="password" placeholder="PIN"><button class="btn primary" style="width:100%;margin-top:10px" onclick="unlockFinance()">Unlock</button></div>
+  </div>
+  <div id="privateContent" style="display:none">
+    <div class="grid kpis" id="privateKpis"></div>
+    <div class="card" style="margin-top:14px">
+      <div class="panel-title"><h3>Private Platform Breakdown</h3><button class="btn red" onclick="lockFinance()">Lock Again</button></div>
+      <div class="table-wrap"><table><thead><tr><th>Platform</th><th>Dummy Orders</th><th>Investment</th><th>Dummy Loss</th></tr></thead><tbody id="privatePlatformRows"></tbody></table></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h3>Dummy Orders</h3>
+      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Account</th><th>Platform</th><th>Order</th><th>Buyer Paid</th><th>Seller Receives</th><th>Loss</th></tr></thead><tbody id="dummyRows"></tbody></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="settings" class="screen">
+  <div class="topbar"><div class="title"><h1>Settings</h1><p>Calculation defaults, admin PIN and data controls.</p></div></div>
+  <div class="grid layout2">
+    <div class="card">
+      <h3>Calculation Rules</h3>
+      <label>Default Real Platform Fee (%)<input id="settingRealFee" type="number" step="0.01"></label>
+      <label>Dummy Seller Payout (%)<input id="settingDummyPayout" type="number" step="0.01"></label>
+      <label>Default Discount (%)<input id="settingDiscount" type="number" step="0.01"></label>
+      <label>Default Referral (%)<input id="settingReferral" type="number" step="0.01"></label>
+      <button class="btn primary" style="margin-top:14px" onclick="saveSettings()">Save Settings</button>
+    </div>
+    <div class="card">
+      <h3>Privacy & Data</h3>
+      <label>Admin PIN<input id="settingPin" type="password"></label>
+      <button class="btn primary" style="margin-top:14px" onclick="savePin()">Update PIN</button>
+      <div style="margin-top:18px"><button class="btn" onclick="downloadBackup()">Download Backup JSON</button> <button class="btn" onclick="document.getElementById('restoreInput').click()">Restore Backup</button><input id="restoreInput" type="file" accept=".json" style="display:none" onchange="restoreBackup(event)"></div>
+      <button class="btn red" style="margin-top:14px" onclick="resetDemo()">Reset Source Data</button>
+    </div>
+  </div>
+</section>
+
+</main>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<div id="accountModal" class="modal">
+  <div class="modal-card">
+    <div class="panel-title"><h3 id="accountModalTitle">Add Account</h3><button class="btn" onclick="closeModal('accountModal')">×</button></div>
+    <input type="hidden" id="editAccountId">
+    <label>Account Name<input id="accountName"></label>
+    <label>Active<select id="accountActive"><option value="true">Yes</option><option value="false">No</option></select></label>
+    <button class="btn primary" style="margin-top:14px" onclick="saveAccount()">Save</button>
+  </div>
+</div>
+
+<div id="managerModal" class="modal">
+  <div class="modal-card">
+    <div class="panel-title"><h3 id="managerModalTitle">Add Manager</h3><button class="btn" onclick="closeModal('managerModal')">×</button></div>
+    <input type="hidden" id="editManagerId">
+    <label>Name<input id="managerName"></label>
+    <label>Account<select id="managerAccount"></select></label>
+    <label>Monthly Target ($)<input id="managerTarget" type="number" step="0.01"></label>
+    <button class="btn primary" style="margin-top:14px" onclick="saveManager()">Save</button>
+  </div>
+</div>
+
+<div id="orderModal" class="modal">
+  <div class="modal-card">
+    <div class="panel-title"><h3>Edit Order</h3><button class="btn" onclick="closeModal('orderModal')">×</button></div>
+    <input type="hidden" id="editOrderId">
+    <div class="form-grid" style="grid-template-columns:1fr 1fr">
+      <label>Amount<input id="editOrderAmount" type="number" step="0.01"></label>
+      <label>Discount (%)<input id="editOrderDiscount" type="number" step="0.01"></label>
+      <label>Referral?<select id="editOrderReferral" onchange="toggleEditReferral()"><option value="no">No</option><option value="yes">Yes</option></select></label>
+      <label id="editReferralPercentWrap">Referral (%)<input id="editOrderReferralPercent" type="number" step="0.01"></label>
+      <label class="edit-referral-detail">Current Client / Buyer<input id="editOrderClientName"></label>
+      <label class="edit-referral-detail">Referral Source Client<input id="editOrderReferralSource"></label>
+      <label class="edit-referral-detail" style="grid-column:span 2">Referral Link (optional)<input id="editOrderReferralLink"></label>
+      <label>Status<select id="editOrderStatus"><option>Completed</option><option>Pending</option><option>Cancelled</option></select></label>
+      <label style="grid-column:span 2">Notes<input id="editOrderNotes"></label>
+    </div>
+    <button class="btn primary" style="margin-top:14px" onclick="saveEditedOrder()">Save</button>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY='trackingHubDataV5_ALL_DATA';
+
+const demoData={"settings":{"realFee":20,"dummyPayout":80,"defaultDiscount":10,"defaultReferral":10,"pin":"1234"},"accounts":[{"id":"a1","name":"Nexency","active":true},{"id":"a2","name":"Design Minds","active":true}],"managers":[],"orders":[{"id":"a1_squarespace_5","date":"2026-10-05","accountId":"a1","platform":"Squarespace","type":"dummy","amount":50.0,"serviceFee":0,"discount":10.0,"platformFee":20,"buyerPaid":50.98,"sellerReceives":40.0,"profitLoss":-10.98,"managerId":"","status":"Completed","notes":"Selected package $50.00; promo -$5.00; service fee $5.98; total paid $50.98; dummy seller return assumed at 80% = $40.00"},{"id":"a1_squarespace_6","date":"2026-10-06","accountId":"a1","platform":"Squarespace","type":"dummy","amount":45.0,"serviceFee":0,"discount":10.0,"platformFee":20,"buyerPaid":46.23,"sellerReceives":36.0,"profitLoss":-10.23,"managerId":"","status":"Completed","notes":"Selected package $45.00; promo -$4.50; service fee $5.73; total paid $46.23; dummy seller return = 80% of package"},{"id":"a1_squarespace_7","date":"2026-10-06","accountId":"a1","platform":"Squarespace","type":"real","amount":100.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":100.0,"sellerReceives":80.0,"profitLoss":80.0,"managerId":"","status":"Completed","notes":"Squarespace real client order \u2014 gross revenue $100; Fiverr fee 20% = $20; seller return $80"},{"id":"a1_squarespace_8","date":"2026-10-06","accountId":"a1","platform":"Squarespace","type":"dummy","amount":60.0,"serviceFee":0,"discount":10.0,"platformFee":20,"buyerPaid":60.47,"sellerReceives":48.0,"profitLoss":-12.47,"managerId":"","status":"Completed","notes":"Selected package $60.00; promo -$6.00; service fee $6.47; total paid $60.47; dummy seller return = 80% of package = $48.00"},{"id":"a1_squarespace_9","date":"2026-10-06","accountId":"a1","platform":"Squarespace","type":"real","amount":150.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":150.0,"sellerReceives":120.0,"profitLoss":120.0,"managerId":"","status":"Completed","notes":"Squarespace real client order \u2014 gross revenue $150; Fiverr fee 20% = $30; seller return $120"},{"id":"a1_squarespace_10","date":"2026-10-07","accountId":"a1","platform":"Squarespace","type":"dummy","amount":50.0,"serviceFee":0,"discount":10.0,"platformFee":20,"buyerPaid":50.98,"sellerReceives":40.0,"profitLoss":-10.98,"managerId":"","status":"Completed","notes":"Selected package $50.00; promo -$5.00; service fee $5.98; total paid $50.98; dummy seller return = 80% of package = $40.00"},{"id":"a1_squarespace_11","date":"2026-10-07","accountId":"a1","platform":"Squarespace","type":"real","amount":200.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":200.0,"sellerReceives":160.0,"profitLoss":160.0,"managerId":"","status":"Completed","notes":"Squarespace real client order \u2014 gross revenue $200; Fiverr fee 20% = $40; seller return $160"},{"id":"a1_squarespace_12","date":"2026-10-07","accountId":"a1","platform":"Squarespace","type":"dummy","amount":55.0,"serviceFee":0,"discount":10.0,"platformFee":20,"buyerPaid":55.72,"sellerReceives":44.0,"profitLoss":-11.72,"managerId":"","status":"Completed","notes":"Selected package $55.00; promo -$5.50; service fee $6.22; total paid $55.72; dummy seller return = 80% of package = $44.00"},{"id":"a1_squarespace_13","date":"2026-10-08","accountId":"a1","platform":"Squarespace","type":"real","amount":400.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":400.0,"sellerReceives":320.0,"profitLoss":320.0,"managerId":"","status":"Completed","notes":"Squarespace real client order \u2014 gross revenue $400.00; Fiverr fee 20% = $80.00; seller return $320.00"},{"id":"a1_squarespace_14","date":"2026-10-10","accountId":"a1","platform":"Squarespace","type":"real","amount":350.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":350.0,"sellerReceives":280.0,"profitLoss":280.0,"managerId":"","status":"Completed","notes":"Squarespace real client order \u2014 gross revenue $350.00; Fiverr fee 20% = $70.00; seller return $280.00"},{"id":"a1_squarespace_15","date":"2026-10-13","accountId":"a1","platform":"Squarespace","type":"real","amount":250.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":250.0,"sellerReceives":200.0,"profitLoss":200.0,"managerId":"","status":"Completed","notes":"Squarespace real client order \u2014 gross revenue $250.00; Fiverr fee 20% = $50.00; seller return $200.00"},{"id":"a1_squarespace_16","date":"2026-10-14","accountId":"a1","platform":"Squarespace","type":"real","amount":100.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":100.0,"sellerReceives":80.0,"profitLoss":80.0,"managerId":"","status":"Completed","notes":"Squarespace real client order \u2014 gross revenue $100.00; Fiverr fee 20% = $20.00; seller return $80.00"},{"id":"a1_squarespace_17","date":"2026-10-14","accountId":"a1","platform":"Squarespace","type":"real","amount":350.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":350.0,"sellerReceives":280.0,"profitLoss":280.0,"managerId":"","status":"Completed","notes":"Squarespace real client order \u2014 gross revenue $350.00; Fiverr fee 20% = $70.00; seller return $280.00"},{"id":"a1_squarespace_18","date":"2026-10-15","accountId":"a1","platform":"Squarespace","type":"real","amount":600.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":600.0,"sellerReceives":480.0,"profitLoss":480.0,"managerId":"","status":"Completed","notes":"Squarespace real client order \u2014 gross revenue $600.00; Fiverr fee 20% = $120.00; seller return $480.00"},{"id":"a1_squarespace_19","date":"2026-10-18","accountId":"a1","platform":"Squarespace","type":"dummy","amount":200.0,"serviceFee":0,"discount":15.0,"platformFee":20,"buyerPaid":182.85,"sellerReceives":160.0,"profitLoss":-22.85,"managerId":"","status":"Completed","notes":"Selected package $200.00; promo -15% = -$30.00; discounted subtotal $170.00; service fee $12.85; total paid $182.85; dummy seller return = 80% of package = $160.00"},{"id":"a1_squarespace_20","date":"2026-10-18","accountId":"a1","platform":"Squarespace","type":"dummy","amount":100.0,"serviceFee":0,"discount":15.0,"platformFee":20,"buyerPaid":93.18,"sellerReceives":80.0,"profitLoss":-13.18,"managerId":"","status":"Completed","notes":"Selected package $100.00; promo -15% = -$15.00; discounted subtotal $85.00; service fee $8.18; total paid $93.18; dummy seller return = 80% of package = $80.00"},{"id":"a1_squarespace_21","date":"2026-10-16","accountId":"a1","platform":"Squarespace","type":"real","amount":100.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":100.0,"sellerReceives":80.0,"profitLoss":80.0,"managerId":"","status":"Completed","notes":"Squarespace real client order \u2014 gross revenue $100.00; Fiverr fee 20% = $20.00; seller return $80.00"},{"id":"a1_squarespace_22","date":"2026-10-18","accountId":"a1","platform":"Squarespace","type":"dummy","amount":100.0,"serviceFee":0,"discount":15.0,"platformFee":20,"buyerPaid":93.18,"sellerReceives":80.0,"profitLoss":-13.18,"managerId":"","status":"Completed","notes":"Selected package $100.00; promo -15% = -$15.00; discounted subtotal $85.00; service fee $8.18; total paid $93.18; dummy seller return = 80% of package = $80.00"},{"id":"a1_squarespace_23","date":"2026-10-18","accountId":"a1","platform":"Squarespace","type":"dummy","amount":100.0,"serviceFee":0,"discount":15.0,"platformFee":20,"buyerPaid":93.18,"sellerReceives":80.0,"profitLoss":-13.18,"managerId":"","status":"Completed","notes":"Selected package $100.00; promo -15% = -$15.00; discounted subtotal $85.00; service fee $8.18; total paid $93.18; dummy seller return = 80% of package = $80.00"},{"id":"a1_squarespace_24","date":"2026-10-22","accountId":"a1","platform":"Squarespace","type":"dummy","amount":100.0,"serviceFee":0,"discount":15.0,"platformFee":20,"buyerPaid":93.18,"sellerReceives":80.0,"profitLoss":-13.18,"managerId":"","status":"Completed","notes":"Selected package $100.00; promo -15% = -$15.00; discounted subtotal $85.00; service fee $8.18; total paid $93.18; seller receives 80% of original package = $80.00; net loss = $13.18"},{"id":"a1_squarespace_25","date":"2026-10-23","accountId":"a1","platform":"Squarespace","type":"real","amount":100.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":100.0,"sellerReceives":80.0,"profitLoss":80.0,"managerId":"","status":"Completed","notes":"Squarespace real client order \u2014 gross revenue $100.00; Fiverr fee 20% = $20.00; seller return $80.00"},{"id":"a1_wix_5","date":"2026-10-06","accountId":"a1","platform":"Wix","type":"real","amount":100.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":100.0,"sellerReceives":80.0,"profitLoss":80.0,"managerId":"","status":"Completed","notes":"Real client Wix order \u2014 gross revenue $100; Fiverr fee 20% = $20; seller return $80"},{"id":"a1_wix_6","date":"2026-10-06","accountId":"a1","platform":"Wix","type":"real","amount":115.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":115.0,"sellerReceives":92.0,"profitLoss":92.0,"managerId":"","status":"Completed","notes":"Real client Wix order \u2014 gross revenue $115; Fiverr fee 20% = $23; seller return $92"},{"id":"a1_wix_7","date":"2026-10-06","accountId":"a1","platform":"Wix","type":"real","amount":350.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":350.0,"sellerReceives":280.0,"profitLoss":280.0,"managerId":"","status":"Completed","notes":"Real client Wix order \u2014 gross revenue $350; Fiverr fee 20% = $70; seller return $280"},{"id":"a1_wix_8","date":"2026-10-07","accountId":"a1","platform":"Wix","type":"dummy","amount":50.0,"serviceFee":0,"discount":15.0,"platformFee":20,"buyerPaid":48.34,"sellerReceives":40.0,"profitLoss":-8.34,"managerId":"","status":"Completed","notes":"Selected package $50.00; promo -$7.50; service fee $5.84; total paid $48.34; dummy seller return = 80% of package = $40.00"},{"id":"a1_wix_9","date":"2026-10-07","accountId":"a1","platform":"Wix","type":"dummy","amount":35.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":40.43,"sellerReceives":28.0,"profitLoss":-12.43,"managerId":"","status":"Completed","notes":"Selected package $35.00; no promo; service fee $5.43; total paid $40.43; dummy seller return = 80% of package = $28.00"},{"id":"a1_wix_10","date":"2026-10-08","accountId":"a1","platform":"Wix","type":"dummy","amount":60.0,"serviceFee":0,"discount":10.0,"platformFee":20,"buyerPaid":60.47,"sellerReceives":48.0,"profitLoss":-12.47,"managerId":"","status":"Completed","notes":"Selected package $60.00; promo -$6.00; service fee $6.47; total paid $60.47; dummy seller return = 80% of package = $48.00"},{"id":"a1_wix_11","date":"2026-10-08","accountId":"a1","platform":"Wix","type":"real","amount":200.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":200.0,"sellerReceives":160.0,"profitLoss":160.0,"managerId":"","status":"Completed","notes":"Wix real client order \u2014 gross revenue $200.00; Fiverr fee 20% = $40.00; seller return $160.00"},{"id":"a1_wix_12","date":"2026-10-08","accountId":"a1","platform":"Wix","type":"real","amount":300.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":300.0,"sellerReceives":240.0,"profitLoss":240.0,"managerId":"","status":"Completed","notes":"Wix real client order \u2014 gross revenue $300.00; Fiverr fee 20% = $60.00; seller return $240.00"},{"id":"a1_wix_13","date":"2026-10-08","accountId":"a1","platform":"Wix","type":"real","amount":350.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":350.0,"sellerReceives":280.0,"profitLoss":280.0,"managerId":"","status":"Completed","notes":"Wix real client order \u2014 gross revenue $350.00; Fiverr fee 20% = $70.00; seller return $280.00"},{"id":"a1_wix_14","date":"2026-10-09","accountId":"a1","platform":"Wix","type":"dummy","amount":72.0,"serviceFee":0,"discount":30.0,"platformFee":20,"buyerPaid":56.67,"sellerReceives":40.0,"profitLoss":-16.67,"managerId":"","status":"Completed","notes":"Dummy Wix order \u2014 total invested $56.67 including service fees; seller receives $40.00; net loss $16.67"},{"id":"a1_wix_15","date":"2026-10-09","accountId":"a1","platform":"Wix","type":"dummy","amount":50.0,"serviceFee":0,"discount":10.0,"platformFee":20,"buyerPaid":50.98,"sellerReceives":40.0,"profitLoss":-10.98,"managerId":"","status":"Completed","notes":"Dummy Wix order \u2014 package $50.00; promo -$5.00; service fee $5.98; total invested $50.98; seller receives $40.00; net loss $10.98"},{"id":"a1_wix_16","date":"2026-10-12","accountId":"a1","platform":"Wix","type":"real","amount":130.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":130.0,"sellerReceives":104.0,"profitLoss":104.0,"managerId":"","status":"Completed","notes":"Wix real client order \u2014 gross revenue $130.00; Fiverr fee 20% = $26.00; seller return $104.00"},{"id":"a1_wix_17","date":"2026-10-12","accountId":"a1","platform":"Wix","type":"real","amount":350.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":350.0,"sellerReceives":280.0,"profitLoss":280.0,"managerId":"","status":"Completed","notes":"Wix real client order \u2014 gross revenue $350.00; Fiverr fee 20% = $70.00; seller return $280.00"},{"id":"a1_wix_18","date":"2026-10-13","accountId":"a1","platform":"Wix","type":"real","amount":295.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":295.0,"sellerReceives":236.0,"profitLoss":236.0,"managerId":"","status":"Completed","notes":"Wix real client order \u2014 gross revenue $295.00; Fiverr fee 20% = $59.00; seller return $236.00"},{"id":"a1_wix_19","date":"2026-10-21","accountId":"a1","platform":"Wix","type":"real","amount":111.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":111.0,"sellerReceives":88.8,"profitLoss":88.8,"managerId":"","status":"Completed","notes":"Wix real client order \u2014 gross revenue $111.00; Fiverr fee 20% = $22.20; seller return $88.80"},{"id":"a1_wix_20","date":"2026-10-20","accountId":"a1","platform":"Wix","type":"real","amount":300.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":300.0,"sellerReceives":240.0,"profitLoss":240.0,"managerId":"","status":"Completed","notes":"Wix real client order \u2014 gross revenue $300.00; Fiverr fee 20% = $60.00; seller return $240.00"},{"id":"a1_wix_21","date":"2026-10-23","accountId":"a1","platform":"Wix","type":"real","amount":350.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":350.0,"sellerReceives":280.0,"profitLoss":280.0,"managerId":"","status":"Completed","notes":"Wix real client order \u2014 gross revenue $350.00; Fiverr fee 20% = $70.00; seller return $280.00"},{"id":"a1_wix_22","date":"2026-10-24","accountId":"a1","platform":"Wix","type":"real","amount":400.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":400.0,"sellerReceives":320.0,"profitLoss":320.0,"managerId":"","status":"Completed","notes":"Wix real client order \u2014 gross revenue $400.00; Fiverr fee 20% = $80.00; seller return $320.00"},{"id":"a1_wordpress_5","date":"2026-10-07","accountId":"a1","platform":"WordPress","type":"real","amount":400.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":400.0,"sellerReceives":320.0,"profitLoss":320.0,"managerId":"","status":"Completed","notes":"WordPress real client order \u2014 gross revenue $400.00; Fiverr fee 20% = $80.00; seller return $320.00"},{"id":"a1_wordpress_6","date":"2026-10-12","accountId":"a1","platform":"WordPress","type":"real","amount":1200.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":1200.0,"sellerReceives":960.0,"profitLoss":960.0,"managerId":"","status":"Completed","notes":"WordPress real client order \u2014 gross revenue $1200.00; Fiverr fee 20% = $240.00; seller return $960.00"},{"id":"a1_wordpress_7","date":"2026-10-19","accountId":"a1","platform":"WordPress","type":"real","amount":320.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":320.0,"sellerReceives":256.0,"profitLoss":256.0,"managerId":"","status":"Completed","notes":"WordPress real client order \u2014 gross revenue $320.00; Fiverr fee 20% = $64.00; seller return $256.00"},{"id":"a1_wordpress_8","date":"2026-10-19","accountId":"a1","platform":"WordPress","type":"real","amount":100.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":100.0,"sellerReceives":80.0,"profitLoss":80.0,"managerId":"","status":"Completed","notes":"WordPress real client order \u2014 gross revenue $100.00; Fiverr fee 20% = $20.00; seller return $80.00"},{"id":"a1_wordpress_9","date":"2026-10-21","accountId":"a1","platform":"WordPress","type":"real","amount":125.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":125.0,"sellerReceives":100.0,"profitLoss":100.0,"managerId":"","status":"Completed","notes":"WordPress real client order \u2014 gross revenue $125.00; Fiverr fee 20% = $25.00; seller return $100.00"},{"id":"a1_shopify_5","date":"2026-10-10","accountId":"a1","platform":"Shopify","type":"dummy","amount":60.0,"serviceFee":0,"discount":10.0,"platformFee":20,"buyerPaid":60.47,"sellerReceives":48.0,"profitLoss":-12.47,"managerId":"","status":"Completed","notes":"Selected package $60.00; promo -$6.00; service fee $6.47; total paid $60.47; seller receives 80% of original package = $48.00; net loss = $12.47"},{"id":"a1_shopify_6","date":"2026-10-21","accountId":"a1","platform":"Shopify","type":"real","amount":600.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":600.0,"sellerReceives":480.0,"profitLoss":480.0,"managerId":"","status":"Completed","notes":"Shopify real client order \u2014 gross revenue $600.00; Fiverr fee 20% = $120.00; seller return $480.00"},{"id":"a1_shopify_7","date":"2026-10-23","accountId":"a1","platform":"Shopify","type":"dummy","amount":100.0,"serviceFee":0,"discount":15.0,"platformFee":20,"buyerPaid":93.18,"sellerReceives":80.0,"profitLoss":-13.18,"managerId":"","status":"Completed","notes":"Selected package $100.00; promo -15% = -$15.00; discounted subtotal $85.00; service fee $8.18; total paid $93.18; seller receives 80% of original package = $80.00; net loss = $13.18"},{"id":"a1_shopify_8","date":"2026-10-24","accountId":"a1","platform":"Shopify","type":"dummy","amount":80.0,"serviceFee":0,"discount":15.0,"platformFee":20,"buyerPaid":73.95,"sellerReceives":64.0,"profitLoss":-9.95,"managerId":"","status":"Completed","notes":"Main order $80.00; service fee $7.00; total before coupon $87.00; 15% coupon = $13.05; buyer paid $73.95; seller receives 80% of $80.00 = $64.00; net loss = $9.95"},{"id":"a1_shopify_9","date":"2026-10-10","accountId":"a1","platform":"Shopify","type":"dummy","amount":65.0,"serviceFee":0,"discount":10.0,"platformFee":20,"buyerPaid":65.22,"sellerReceives":52.0,"profitLoss":-13.22,"managerId":"","status":"Completed","notes":"Selected package $65.00; promo -$6.50; service fee $6.72; total paid $65.22; seller receives 80% of original package = $52.00; net loss = $13.22"},{"id":"a2_wix_7","date":"2026-10-05","accountId":"a2","platform":"Wix","type":"real","amount":150.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":150.0,"sellerReceives":120.0,"profitLoss":120.0,"managerId":"","status":"Completed","notes":"Real client revenue; 20% platform fee."},{"id":"a2_wix_9","date":"2026-10-05","accountId":"a2","platform":"Wix","type":"real","amount":50.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":50.0,"sellerReceives":40.0,"profitLoss":40.0,"managerId":"","status":"Completed","notes":"Real client revenue; 20% platform fee."},{"id":"a2_wix_10","date":"2026-10-06","accountId":"a2","platform":"Wix","type":"real","amount":50.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":50.0,"sellerReceives":40.0,"profitLoss":40.0,"managerId":"","status":"Completed","notes":"Real client revenue; 20% platform fee."},{"id":"a2_wix_11","date":"2026-10-07","accountId":"a2","platform":"Wix","type":"real","amount":90.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":90.0,"sellerReceives":72.0,"profitLoss":72.0,"managerId":"","status":"Completed","notes":"Real client revenue; 20% platform fee."},{"id":"a2_wix_12","date":"2026-10-13","accountId":"a2","platform":"Wix","type":"real","amount":350.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":350.0,"sellerReceives":280.0,"profitLoss":280.0,"managerId":"","status":"Completed","notes":"Real client order $350; net revenue $280 after 20% platform fee."},{"id":"a2_wordpress_5","date":"2026-10-08","accountId":"a2","platform":"WordPress","type":"dummy","amount":50.0,"serviceFee":0,"discount":10.0,"platformFee":20,"buyerPaid":50.98,"sellerReceives":45.0,"profitLoss":-5.98,"managerId":"","status":"Completed","notes":"Replaces previous $30 WordPress investment: $50 package, $5 promo discount, $5.98 fee, $50.98 paid. 10% referral credit. Buyer fee $5.98; referral credit $5."},{"id":"a2_wordpress_6","date":"2026-10-08","accountId":"a2","platform":"WordPress","type":"dummy","amount":50.0,"serviceFee":0,"discount":10.0,"platformFee":20,"buyerPaid":50.98,"sellerReceives":45.0,"profitLoss":-5.98,"managerId":"","status":"Completed","notes":"New investment order from screenshot; $50 value, $5 discount, $5.98 fee, $50.98 total. Referral credit $5; redemption not recorded. Buyer fee $5.98; referral credit $5."},{"id":"a2_wordpress_7","date":"2026-10-09","accountId":"a2","platform":"WordPress","type":"real","amount":25.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":25.0,"sellerReceives":20.0,"profitLoss":20.0,"managerId":"","status":"Completed","notes":"Real client revenue; 20% platform fee."},{"id":"a2_wordpress_8","date":"2026-10-11","accountId":"a2","platform":"WordPress","type":"dummy","amount":50.0,"serviceFee":0,"discount":10.0,"platformFee":20,"buyerPaid":50.98,"sellerReceives":45.0,"profitLoss":-5.98,"managerId":"","status":"Completed","notes":"Package $50; promo discount $5; service fee $5.98; paid $50.98. Referral credit $5."},{"id":"a2_wordpress_9","date":"2026-10-11","accountId":"a2","platform":"WordPress","type":"dummy","amount":50.0,"serviceFee":0,"discount":10.0,"platformFee":20,"buyerPaid":50.98,"sellerReceives":45.0,"profitLoss":-5.98,"managerId":"","status":"Completed","notes":"Package $50; promo discount $5; service fee $5.98; paid $50.98. Referral credit $5."},{"id":"a2_wordpress_10","date":"2026-10-12","accountId":"a2","platform":"WordPress","type":"dummy","amount":50.0,"serviceFee":0,"discount":15.0,"platformFee":20,"buyerPaid":39.37,"sellerReceives":30.0,"profitLoss":-9.37,"managerId":"","status":"Completed","notes":"Actual cash $39.37; previous referral credit $10 used; buyer fee $5.37. Reported 15% discount differs from actual checkout by $1.50. Loss uses actual cash plus credit consumed. No new referral credit confirmed."},{"id":"a2_wordpress_11","date":"2026-10-12","accountId":"a2","platform":"WordPress","type":"dummy","amount":50.0,"serviceFee":0,"discount":10.0,"platformFee":20,"buyerPaid":50.98,"sellerReceives":45.0,"profitLoss":-5.98,"managerId":"","status":"Completed","notes":"Screenshot: package $50; discount $5; fee $5.98; payment $50.98. Referral credit $5 under existing 10% rule."},{"id":"a2_wordpress_12","date":"2026-10-12","accountId":"a2","platform":"WordPress","type":"dummy","amount":50.0,"serviceFee":0,"discount":10.0,"platformFee":20,"buyerPaid":50.98,"sellerReceives":45.0,"profitLoss":-5.98,"managerId":"","status":"Completed","notes":"Package $50; promo discount $5; service fee $5.98; paid $50.98. Referral credit $5 under existing 10% rule."},{"id":"a2_wordpress_13","date":"2026-10-13","accountId":"a2","platform":"WordPress","type":"real","amount":25.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":25.0,"sellerReceives":20.0,"profitLoss":20.0,"managerId":"","status":"Completed","notes":"Real client order $25; net revenue $20 after 20% platform fee."},{"id":"a2_wordpress_14","date":"2026-10-13","accountId":"a2","platform":"WordPress","type":"dummy","amount":50.0,"serviceFee":0,"discount":10.0,"platformFee":20,"buyerPaid":50.98,"sellerReceives":45.0,"profitLoss":-5.98,"managerId":"","status":"Completed","notes":"Screenshot: package $50; promo $5; fee $5.98; total $50.98. Referral credit $5 under existing 10% rule."},{"id":"a2_wordpress_15","date":"2026-10-13","accountId":"a2","platform":"WordPress","type":"dummy","amount":55.0,"serviceFee":0,"discount":10.0,"platformFee":20,"buyerPaid":55.72,"sellerReceives":49.5,"profitLoss":-6.22,"managerId":"","status":"Completed","notes":"Screenshot: package $55; promo $5.50; fee $6.22; payment $55.72. Referral credit $5.50 under existing 10% rule."},{"id":"a2_wordpress_16","date":"2026-10-13","accountId":"a2","platform":"WordPress","type":"dummy","amount":50.0,"serviceFee":0,"discount":10.0,"platformFee":20,"buyerPaid":50.98,"sellerReceives":45.0,"profitLoss":-5.98,"managerId":"","status":"Completed","notes":"New dummy order: package $50; promo $5; fee $5.98; paid $50.98. Referral credit $5 under existing 10% rule."},{"id":"a2_wordpress_17","date":"2026-10-14","accountId":"a2","platform":"WordPress","type":"dummy","amount":55.0,"serviceFee":0,"discount":10.0,"platformFee":20,"buyerPaid":55.72,"sellerReceives":49.5,"profitLoss":-6.22,"managerId":"","status":"Completed","notes":"Screenshot: package $55; promo $5.50; fee $6.22; paid $55.72. Referral credit $5.50 under existing 10% rule."},{"id":"a2_wordpress_18","date":"2026-10-15","accountId":"a2","platform":"WordPress","type":"dummy","amount":55.0,"serviceFee":0,"discount":10.0,"platformFee":20,"buyerPaid":55.72,"sellerReceives":49.5,"profitLoss":-6.22,"managerId":"","status":"Completed","notes":"Screenshot: package $55; promo $5.50; fee $6.22; paid $55.72. Referral credit $5.50 under existing 10% rule."},{"id":"a2_wordpress_19","date":"2026-10-18","accountId":"a2","platform":"WordPress","type":"dummy","amount":100.0,"serviceFee":0,"discount":10.0,"platformFee":20,"buyerPaid":98.45,"sellerReceives":88.0,"profitLoss":-10.45,"managerId":"","status":"Completed","notes":"Screenshot: $100 package; $10 promo; $8.45 fee; $98.45 paid. Referral $10, expected cash value $8 after 20% deduction per latest instruction. Earlier orders retain their recorded basis."},{"id":"a2_wordpress_20","date":"2026-10-05","accountId":"a2","platform":"WordPress","type":"real","amount":275.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":275.0,"sellerReceives":220.0,"profitLoss":220.0,"managerId":"","status":"Completed","notes":"Real client revenue; 20% platform fee."},{"id":"a2_wordpress_21","date":"2026-10-24","accountId":"a2","platform":"WordPress","type":"real","amount":256.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":256.0,"sellerReceives":204.8,"profitLoss":204.8,"managerId":"","status":"Completed","notes":"User confirmed 2026-10-24; client name not supplied."},{"id":"a2_wordpress_22","date":"2026-10-24","accountId":"a2","platform":"WordPress","type":"real","amount":800.0,"serviceFee":0,"discount":0.0,"platformFee":20,"buyerPaid":800.0,"sellerReceives":640.0,"profitLoss":640.0,"managerId":"","status":"Completed","notes":"User confirmed 2026-10-24; client name not supplied."}],"extras":[{"id":"ex_dm_wix_tip","date":"2026-10-24","accountId":"a2","platform":"Wix","kind":"tip","gross":70.0,"fee":14.0,"net":56.0,"notes":"Confirmed Wix tip; excluded from order count."}],"privateAdjustments":[{"id":"pa_dm_legacy_loss","accountId":"a2","kind":"dummy_loss_adjustment","amount":170.68,"notes":"Private legacy adjustment so Design Minds agreed dummy loss matches $257.00."},{"id":"pa_dm_withdrawal","accountId":"a2","kind":"withdrawal_fee","amount":4.0,"notes":"Confirmed withdrawal fee (2026-10-15)."}]};
+
+let db=loadData();
+db.settings=db.settings||{};if(db.settings.defaultReferral==null)db.settings.defaultReferral=10;db.orders=(db.orders||[]).map(o=>({hasReferral:false,referralPercent:0,referralGross:0,referralNet:0,clientName:'',referralSourceClient:'',referralLink:'',...o}));
+let currentAccountId='a1';
+let platformChart,accountChart;
+
+function clone(x){return JSON.parse(JSON.stringify(x))}
+function loadData(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||clone(demoData)}catch(e){return clone(demoData)}}
+function persist(){localStorage.setItem(STORAGE_KEY,JSON.stringify(db))}
+function id(prefix){return prefix+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function money(n){return '$'+Number(n||0).toFixed(2)}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)}
+function getAccount(id){return db.accounts.find(x=>x.id===id)}
+function getManager(id){return db.managers.find(x=>x.id===id)}
+function visibleOrders(){return db.orders.filter(o=>o.status!=='Cancelled')}
+function realOrders(){return visibleOrders().filter(o=>o.type==='real')}
+function dummyOrders(){return visibleOrders().filter(o=>o.type==='dummy')}
+function accountExtras(accountId){return (db.extras||[]).filter(x=>x.accountId===accountId)}
+function accountPrivateAdjustments(accountId){return (db.privateAdjustments||[]).filter(x=>x.accountId===accountId)}
+
+function go(screen){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(screen).classList.add('active');
+  document.querySelectorAll('#sideNav a').forEach(a=>a.classList.toggle('active',a.dataset.screen===screen));
+  if(screen==='dashboard') renderDashboard();
+  if(screen==='orders') renderOrders();
+  if(screen==='accounts') renderAccounts();
+  if(screen==='managers') renderManagers();
+  if(screen==='private') renderPrivate();
+  if(screen==='referrals') renderReferrals();
+  if(screen==='settings') renderSettings();
+  if(screen==='addOrder') populateOrderForm();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+document.querySelectorAll('#sideNav a').forEach(a=>a.addEventListener('click',()=>go(a.dataset.screen)));
+
+function populateSelects(){
+  const accountOpts=db.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
+  document.getElementById('orderAccount').innerHTML=accountOpts;
+  document.getElementById('filterAccount').innerHTML='<option value="">All Accounts</option>'+accountOpts;
+  if(document.getElementById('referralFilterAccount')) document.getElementById('referralFilterAccount').innerHTML='<option value="">All Accounts</option>'+accountOpts;
+  document.getElementById('managerAccount').innerHTML=accountOpts;
+  const managerOpts='<option value="">Unassigned</option>'+db.managers.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+  document.getElementById('orderManager').innerHTML=managerOpts;
+}
+
+function calcOrder(type,amount,serviceFee,discount,platformFee,hasReferral=false,referralPercent=0){
+  amount=+amount||0;serviceFee=+serviceFee||0;discount=+discount||0;platformFee=+platformFee||0;referralPercent=+referralPercent||0;
+  const discountAmount=amount*(discount/100);
+  const buyerPaid=Math.max(0,amount-discountAmount)+serviceFee;
+  const referralGross=hasReferral?amount*(referralPercent/100):0;
+  const referralFee=referralGross*(platformFee/100);
+  const referralNet=referralGross-referralFee;
+  if(type==='real'){
+    const orderFee=amount*(platformFee/100);
+    const fee=orderFee+referralFee;
+    const sellerReceives=(amount-orderFee)+referralNet;
+    return {discountAmount,buyerPaid,referralGross,referralNet,fee,sellerReceives,profitLoss:sellerReceives};
+  }
+  const basePayout=amount*(db.settings.dummyPayout/100);
+  const sellerReceives=basePayout+referralNet;
+  const loss=Math.max(0,buyerPaid-sellerReceives);
+  return {discountAmount,buyerPaid,referralGross,referralNet,fee:referralFee,sellerReceives,profitLoss:-loss};
+}
+
+function populateOrderForm(){
+  populateSelects();
+  orderPlatformFee.value=db.settings.realFee;
+  orderDiscount.value=0;
+  orderReferral.value='no';
+  orderReferralPercent.value=db.settings.defaultReferral??10;
+  orderDate.value=new Date().toISOString().slice(0,10);
+  toggleReferral();
+  calculateOrderPreview();
+}
+function toggleReferral(){
+  const on=orderReferral.value==='yes';
+  referralPercentWrap.style.opacity=on?'1':'.45';
+  orderReferralPercent.disabled=!on;
+  document.querySelectorAll('.referral-detail').forEach(el=>{el.style.display=on?'block':'none'});
+}
+function calculateOrderPreview(){
+  const hasReferral=orderReferral.value==='yes';
+  const r=calcOrder(orderType.value,orderAmount.value,orderService.value,orderDiscount.value,orderPlatformFee.value,hasReferral,orderReferralPercent.value);
+  discountOut.textContent=money(r.discountAmount);
+  buyerPaid.textContent=money(r.buyerPaid);
+  referralGrossOut.textContent=hasReferral?money(r.referralGross):'$0.00';
+  referralNetOut.textContent=hasReferral?money(r.referralNet):'$0.00';
+  if(orderType.value==='dummy'){
+    feeOut.textContent='Private';sellerReceives.textContent='Private';profitLoss.textContent='Private';
+  }else{
+    feeOut.textContent=money(r.fee);sellerReceives.textContent=money(r.sellerReceives);profitLoss.textContent=money(r.profitLoss);
+  }
+}
+function saveOrder(){
+  const type=orderType.value,amount=+orderAmount.value||0,serviceFee=+orderService.value||0,discount=+orderDiscount.value||0,platformFee=+orderPlatformFee.value||0;
+  const hasReferral=orderReferral.value==='yes',referralPercent=hasReferral?(+orderReferralPercent.value||0):0;
+  if(!amount){toast('Enter an order amount');return}
+  const r=calcOrder(type,amount,serviceFee,discount,platformFee,hasReferral,referralPercent);
+  db.orders.push({id:id('o'),date:orderDate.value,accountId:orderAccount.value,platform:orderPlatform.value,type,amount,serviceFee,discount,platformFee,hasReferral,referralPercent,referralGross:r.referralGross,referralNet:r.referralNet,clientName:hasReferral?orderClientName.value.trim():'',referralSourceClient:hasReferral?orderReferralSource.value.trim():'',referralLink:hasReferral?orderReferralLink.value.trim():'',buyerPaid:r.buyerPaid,sellerReceives:r.sellerReceives,profitLoss:r.profitLoss,managerId:orderManager.value,status:orderStatus.value,notes:orderNotes.value});
+  persist();toast('Order saved');orderNotes.value='';orderClientName.value='';orderReferralSource.value='';orderReferralLink.value='';go('orders');
+}
+
+function totalsForAccount(accountId){
+  const ros=realOrders().filter(o=>o.accountId===accountId);
+  const dos=dummyOrders().filter(o=>o.accountId===accountId);
+  const extras=accountExtras(accountId);
+  const adjs=accountPrivateAdjustments(accountId);
+  const tipGross=extras.filter(x=>x.kind==='tip').reduce((s,x)=>s+(+x.gross||0),0);
+  const tipNet=extras.filter(x=>x.kind==='tip').reduce((s,x)=>s+(+x.net||0),0);
+  const extraLoss=adjs.filter(x=>x.kind==='dummy_loss_adjustment').reduce((s,x)=>s+(+x.amount||0),0);
+  const withdrawal=adjs.filter(x=>x.kind==='withdrawal_fee').reduce((s,x)=>s+(+x.amount||0),0);
+  return {
+    realCount:ros.length,dummyCount:dos.length,
+    sales:ros.reduce((s,o)=>s+o.amount,0),
+    net:ros.reduce((s,o)=>s+o.sellerReceives,0),
+    tipGross,tipNet,
+    income:ros.reduce((s,o)=>s+o.sellerReceives,0)+tipNet,
+    loss:dos.reduce((s,o)=>s+Math.abs(o.profitLoss),0)+extraLoss,
+    recordedLoss:dos.reduce((s,o)=>s+Math.abs(o.profitLoss),0),
+    invest:dos.reduce((s,o)=>s+o.buyerPaid,0),withdrawal
+  }
+}
+
+function renderDashboard(){
+  const ros=realOrders(), dos=dummyOrders();
+  const totalSales=ros.reduce((s,o)=>s+o.amount,0),tipNet=(db.extras||[]).reduce((s,x)=>s+(+x.net||0),0),net=ros.reduce((s,o)=>s+o.sellerReceives,0)+tipNet;
+  dashboardKpis.innerHTML=`
+    <div class="card"><div class="kpi-label">Total Sales (Real)</div><div class="kpi-value">${money(totalSales)}</div><div class="kpi-sub green">${ros.length} real orders</div></div>
+    <div class="card"><div class="kpi-label">Net Revenue</div><div class="kpi-value">${money(net)}</div><div class="kpi-sub">Includes ${money(tipNet)} net tips</div></div>
+    <div class="card"><div class="kpi-label">Total Orders</div><div class="kpi-value">${ros.length+dos.length}</div><div class="kpi-sub">Across all accounts</div></div>
+    <div class="card"><div class="kpi-label">Private Metrics</div><div class="kpi-value hidden-metric">••••••</div><div class="kpi-sub">Admin only</div></div>`;
+  dashAccountRows.innerHTML=db.accounts.map(a=>{const t=totalsForAccount(a.id);return `<tr><td><b>${a.name}</b></td><td>${t.realCount}</td><td>${money(t.sales)}</td><td class="green">${money(t.income)}</td><td><button class="btn" onclick="openAccount('${a.id}')">View</button></td></tr>`}).join('');
+
+  const platformMap={};ros.forEach(o=>platformMap[o.platform]=(platformMap[o.platform]||0)+o.amount);
+  if(platformChart)platformChart.destroy();
+  platformChart=new Chart(document.getElementById('platformChart'),{type:'doughnut',data:{labels:Object.keys(platformMap),datasets:[{data:Object.values(platformMap),backgroundColor:['#3d8bfd','#22b573','#8b6cff','#f7b73b','#ff7a90'],borderWidth:0}]},options:{plugins:{legend:{position:'bottom'}},cutout:'66%',maintainAspectRatio:false}});
+  const acctLabels=[],acctData=[];db.accounts.forEach(a=>{acctLabels.push(a.name);acctData.push(totalsForAccount(a.id).sales)});
+  if(accountChart)accountChart.destroy();
+  accountChart=new Chart(document.getElementById('accountChart'),{type:'bar',data:{labels:acctLabels,datasets:[{data:acctData,backgroundColor:'#6d4aff'}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}},maintainAspectRatio:false}});
+}
+
+function renderOrders(){
+  populateSelects();
+  const af=filterAccount.value,pf=filterPlatform.value,tf=filterType.value,q=filterSearch.value.toLowerCase();
+  const rows=db.orders.filter(o=>(!af||o.accountId===af)&&(!pf||o.platform===pf)&&(!tf||o.type===tf)&&(!q||(getAccount(o.accountId)?.name||'').toLowerCase().includes(q)||(o.notes||'').toLowerCase().includes(q))).sort((a,b)=>b.date.localeCompare(a.date));
+  ordersRows.innerHTML=rows.map(o=>`<tr>
+    <td>${o.date}</td><td>${getAccount(o.accountId)?.name||'-'}</td><td>${o.platform}</td>
+    <td><span class="tag ${o.type}">${o.type==='real'?'Real':'Dummy'}</span></td>
+    <td>${money(o.amount)}</td><td>${money(o.buyerPaid)}</td><td>${o.hasReferral?`${o.referralPercent||0}% (${money(o.referralNet||0)})${o.referralSourceClient?`<br><small>from ${esc(o.referralSourceClient)}</small>`:''}`:'No'}</td><td>${o.type==='dummy'?'Private':money(o.sellerReceives)}</td>
+    <td>${getManager(o.managerId)?.name||'-'}</td><td><span class="tag active">${o.status}</span></td>
+    <td class="row-actions"><button class="btn" onclick="editOrder('${o.id}')">Edit</button><button class="btn red" onclick="deleteOrder('${o.id}')">Delete</button></td>
+  </tr>`).join('');
+}
+function toggleEditReferral(){const on=editOrderReferral.value==='yes';editReferralPercentWrap.style.opacity=on?'1':'.45';editOrderReferralPercent.disabled=!on;document.querySelectorAll('.edit-referral-detail').forEach(el=>{el.style.display=on?'block':'none'})}
+function editOrder(orderId){const o=db.orders.find(x=>x.id===orderId);editOrderId.value=o.id;editOrderAmount.value=o.amount;editOrderDiscount.value=o.discount||0;editOrderReferral.value=o.hasReferral?'yes':'no';editOrderReferralPercent.value=o.referralPercent??db.settings.defaultReferral??10;editOrderClientName.value=o.clientName||'';editOrderReferralSource.value=o.referralSourceClient||'';editOrderReferralLink.value=o.referralLink||'';editOrderStatus.value=o.status;editOrderNotes.value=o.notes||'';toggleEditReferral();openModal('orderModal')}
+function saveEditedOrder(){const o=db.orders.find(x=>x.id===editOrderId.value);o.amount=+editOrderAmount.value||0;o.discount=+editOrderDiscount.value||0;o.hasReferral=editOrderReferral.value==='yes';o.referralPercent=o.hasReferral?(+editOrderReferralPercent.value||0):0;o.clientName=o.hasReferral?editOrderClientName.value.trim():'';o.referralSourceClient=o.hasReferral?editOrderReferralSource.value.trim():'';o.referralLink=o.hasReferral?editOrderReferralLink.value.trim():'';o.status=editOrderStatus.value;o.notes=editOrderNotes.value;const r=calcOrder(o.type,o.amount,o.serviceFee,o.discount,o.platformFee,o.hasReferral,o.referralPercent);Object.assign(o,{referralGross:r.referralGross,referralNet:r.referralNet,buyerPaid:r.buyerPaid,sellerReceives:r.sellerReceives,profitLoss:r.profitLoss});persist();closeModal('orderModal');renderOrders();renderDashboard();renderAccounts();renderReferrals();toast('Order updated')}
+function deleteOrder(orderId){if(confirm('Delete this order?')){db.orders=db.orders.filter(o=>o.id!==orderId);persist();renderOrders();toast('Order deleted')}}
+
+function accountPlatformSummary(){
+  const platforms=['WordPress','Squarespace','Wix','Shopify','Webflow'];
+  const rows=[];
+  db.accounts.forEach(a=>{
+    platforms.forEach(platform=>{
+      const orders=visibleOrders().filter(o=>o.accountId===a.id&&o.platform===platform);
+      const real=orders.filter(o=>o.type==='real');
+      const dummy=orders.filter(o=>o.type==='dummy');
+      if(!orders.length) return;
+      const tipNet=accountExtras(a.id).filter(x=>x.platform===platform&&x.kind==='tip').reduce((s,x)=>s+(+x.net||0),0); const tipGross=accountExtras(a.id).filter(x=>x.platform===platform&&x.kind==='tip').reduce((s,x)=>s+(+x.gross||0),0); rows.push({account:a,platform,realCount:real.length,dummyCount:dummy.length,totalCount:orders.length,sales:real.reduce((s,o)=>s+o.amount,0),net:real.reduce((s,o)=>s+o.sellerReceives,0)+tipNet,tipGross});
+    });
+  });
+  return rows;
+}
+function renderAccounts(){
+  accountPlatformRows.innerHTML=accountPlatformSummary().map(r=>`<tr><td><b>${r.account.name}</b></td><td>${r.platform}</td><td>${r.realCount}</td><td>${r.dummyCount}</td><td><b>${r.totalCount}</b></td><td>${money(r.sales)}</td><td>${money(r.tipGross||0)}</td><td class="green">${money(r.net)}</td><td><button class="btn" onclick="openAccount('${r.account.id}')">View Account</button></td></tr>`).join('')||`<tr><td colspan="9" class="muted">No account/platform order data yet.</td></tr>`;
+  accountCards.innerHTML=db.accounts.map(a=>{const t=totalsForAccount(a.id);const total=visibleOrders().filter(o=>o.accountId===a.id).length;const dummy=visibleOrders().filter(o=>o.accountId===a.id&&o.type==='dummy').length;return `<div class="card"><h3>${a.name}</h3><p class="muted">${a.active?'Active':'Inactive'} • ${total} total orders</p><div class="statline"><span>Real Orders</span><b>${t.realCount}</b></div><div class="statline"><span>Dummy Orders</span><b>${dummy}</b></div><div class="statline"><span>Real Sales</span><b>${money(t.sales)}</b></div><div class="statline"><span>Net Revenue</span><b class="green">${money(t.income)}</b></div>${t.tipGross?`<div class="statline"><span>Tips (Gross)</span><b>${money(t.tipGross)}</b></div>`:''}<div class="row-actions" style="margin-top:12px"><button class="btn primary" onclick="openAccount('${a.id}')">View</button><button class="btn" onclick="openAccountModal('${a.id}')">Edit</button><button class="btn red" onclick="deleteAccount('${a.id}')">Delete</button></div></div>`}).join('');
+}
+function openAccount(accountId){currentAccountId=accountId;renderAccountDetails();go('accountDetails')}
+function renderAccountDetails(){
+  const a=getAccount(currentAccountId),t=totalsForAccount(currentAccountId),orders=db.orders.filter(o=>o.accountId===currentAccountId);
+  accountTitle.textContent=a?.name||'Account';
+  accOverview.innerHTML=`<div class="grid kpis"><div class="card"><div class="kpi-label">Real Sales</div><div class="kpi-value">${money(t.sales)}</div></div><div class="card"><div class="kpi-label">Net Revenue</div><div class="kpi-value">${money(t.income)}</div><div class="kpi-sub">${t.tipNet?`Includes ${money(t.tipNet)} net tips`:'After platform fees'}</div></div><div class="card"><div class="kpi-label">Real Orders</div><div class="kpi-value">${t.realCount}</div></div><div class="card"><div class="kpi-label">Private Metrics</div><div class="kpi-value">••••••</div></div></div>`;
+  accOrders.innerHTML=`<div class="card"><h3>Orders</h3><div class="table-wrap"><table><thead><tr><th>Date</th><th>Platform</th><th>Type</th><th>Amount</th><th>Status</th></tr></thead><tbody>${orders.map(o=>`<tr><td>${o.date}</td><td>${o.platform}</td><td>${o.type}</td><td>${money(o.amount)}</td><td>${o.status}</td></tr>`).join('')}</tbody></table></div></div>`;
+  const platforms={};orders.forEach(o=>{platforms[o.platform]=platforms[o.platform]||{real:0,dummy:0,sales:0,net:0,tips:0};if(o.type==='real'){platforms[o.platform].real++;platforms[o.platform].sales+=o.amount;platforms[o.platform].net+=o.sellerReceives}else platforms[o.platform].dummy++}); accountExtras(currentAccountId).forEach(x=>{platforms[x.platform]=platforms[x.platform]||{real:0,dummy:0,sales:0,net:0,tips:0};platforms[x.platform].tips+=(+x.gross||0);platforms[x.platform].net+=(+x.net||0)});
+  accPlatforms.innerHTML=`<div class="card"><div class="panel-title"><div><h3>Platform Breakdown</h3><p class="muted" style="margin:4px 0 0">Order counts are visible; dummy loss remains private.</p></div></div><div class="table-wrap"><table><thead><tr><th>Platform</th><th>Real Orders</th><th>Dummy Orders</th><th>Total Orders</th><th>Real Sales</th><th>Tips</th><th>Net Revenue</th></tr></thead><tbody>${Object.entries(platforms).map(([p,v])=>`<tr><td><b>${p}</b></td><td>${v.real}</td><td>${v.dummy}</td><td><b>${v.real+v.dummy}</b></td><td>${money(v.sales)}</td><td>${money(v.tips||0)}</td><td class="green">${money(v.net)}</td></tr>`).join('')}</tbody></table></div></div>`;
+  const refs=orders.filter(o=>o.hasReferral);accReferrals.innerHTML=`<div class="card"><div class="panel-title"><h3>Referral Summary</h3><span class="pill">${refs.length} uses</span></div><div class="grid layout3"><div class="mini"><small>Referral Uses</small><strong>${refs.length}</strong></div><div class="mini"><small>Gross Referral</small><strong>${money(refs.reduce((s,o)=>s+(+o.referralGross||0),0))}</strong></div><div class="mini"><small>Net Referral</small><strong>${money(refs.reduce((s,o)=>s+(+o.referralNet||0),0))}</strong></div></div><div class="table-wrap" style="margin-top:14px"><table><thead><tr><th>Date</th><th>Platform</th><th>Source Client</th><th>Used For</th><th>Gross</th><th>Net</th></tr></thead><tbody>${refs.map(o=>`<tr><td>${o.date}</td><td>${esc(o.platform)}</td><td>${esc(o.referralSourceClient||'Not set')}</td><td>${esc(o.clientName||'Not set')}</td><td>${money(o.referralGross||0)}</td><td>${money(o.referralNet||0)}</td></tr>`).join('')}</tbody></table></div></div>`;
+}
+function subtab(id,btn){document.querySelectorAll('#accountDetails .subscreen').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('#accountDetails .tab').forEach(x=>x.classList.remove('active'));btn.classList.add('active')}
+
+function openAccountModal(accountId=''){editAccountId.value=accountId;accountModalTitle.textContent=accountId?'Edit Account':'Add Account';const a=getAccount(accountId);accountName.value=a?.name||'';accountActive.value=String(a?.active??true);openModal('accountModal')}
+function saveAccount(){const name=accountName.value.trim();if(!name){toast('Enter account name');return}if(editAccountId.value){const a=getAccount(editAccountId.value);a.name=name;a.active=accountActive.value==='true'}else db.accounts.push({id:id('a'),name,active:accountActive.value==='true'});persist();populateSelects();closeModal('accountModal');renderAccounts();toast('Account saved')}
+function deleteAccount(accountId){if(db.orders.some(o=>o.accountId===accountId)){alert('Delete/move this account’s orders first.');return}if(confirm('Delete account?')){db.accounts=db.accounts.filter(a=>a.id!==accountId);persist();renderAccounts();toast('Account deleted')}}
+
+function managerSales(managerId){return realOrders().filter(o=>o.managerId===managerId).reduce((s,o)=>s+o.amount,0)}
+function renderManagers(){managerCards.innerHTML=db.managers.map(m=>{const sales=managerSales(m.id),pct=m.target?Math.min(100,sales/m.target*100):0;return `<div class="card"><h3>${m.name}</h3><p class="muted">${getAccount(m.accountId)?.name||'-'}</p><div class="statline"><span>Sales</span><b>${money(sales)}</b></div><div class="statline"><span>Target</span><b>${money(m.target)}</b></div><div class="progress" style="margin-top:10px"><span style="width:${pct}%"></span></div><div class="row-actions" style="margin-top:12px"><button class="btn" onclick="openManagerModal('${m.id}')">Edit</button><button class="btn red" onclick="deleteManager('${m.id}')">Delete</button></div></div>`}).join('')}
+function openManagerModal(managerId=''){populateSelects();editManagerId.value=managerId;managerModalTitle.textContent=managerId?'Edit Manager':'Add Manager';const m=getManager(managerId);managerName.value=m?.name||'';managerAccount.value=m?.accountId||db.accounts[0]?.id||'';managerTarget.value=m?.target||0;openModal('managerModal')}
+function saveManager(){const name=managerName.value.trim();if(!name){toast('Enter manager name');return}if(editManagerId.value){const m=getManager(editManagerId.value);m.name=name;m.accountId=managerAccount.value;m.target=+managerTarget.value||0}else db.managers.push({id:id('m'),name,accountId:managerAccount.value,target:+managerTarget.value||0});persist();populateSelects();closeModal('managerModal');renderManagers();toast('Manager saved')}
+function deleteManager(managerId){if(confirm('Delete manager? Orders will become unassigned.')){db.orders.forEach(o=>{if(o.managerId===managerId)o.managerId=''});db.managers=db.managers.filter(m=>m.id!==managerId);persist();renderManagers();toast('Manager deleted')}}
+
+function referralOrders(){return (db.orders||[]).filter(o=>o.hasReferral)}
+function renderReferrals(){
+  if(!document.getElementById('referralKpis'))return;
+  const all=referralOrders();
+  const gross=all.reduce((s,o)=>s+(+o.referralGross||0),0),net=all.reduce((s,o)=>s+(+o.referralNet||0),0);
+  const sources=new Set(all.map(o=>(o.referralSourceClient||'').trim().toLowerCase()).filter(Boolean));
+  referralKpis.innerHTML=`<div class="card"><div class="kpi-label">Referral Uses</div><div class="kpi-value">${all.length}</div><div class="kpi-sub">Across all accounts</div></div><div class="card"><div class="kpi-label">Source Clients</div><div class="kpi-value">${sources.size}</div><div class="kpi-sub">Unique referral sources</div></div><div class="card"><div class="kpi-label">Referral Gross</div><div class="kpi-value">${money(gross)}</div></div><div class="card"><div class="kpi-label">Referral Net</div><div class="kpi-value green">${money(net)}</div></div>`;
+  referralAccountRows.innerHTML=db.accounts.map(a=>{const os=all.filter(o=>o.accountId===a.id);const ss=new Set(os.map(o=>(o.referralSourceClient||'').trim().toLowerCase()).filter(Boolean));return `<tr><td><b>${esc(a.name)}</b></td><td>${os.length}</td><td>${ss.size}</td><td>${money(os.reduce((s,o)=>s+(+o.referralGross||0),0))}</td><td class="green">${money(os.reduce((s,o)=>s+(+o.referralNet||0),0))}</td></tr>`}).join('');
+  const af=referralFilterAccount?.value||'',q=(referralSearch?.value||'').toLowerCase();
+  const rows=all.filter(o=>(!af||o.accountId===af)&&(!q||[o.referralSourceClient,o.clientName,o.platform,getAccount(o.accountId)?.name].some(v=>(v||'').toLowerCase().includes(q)))).sort((a,b)=>b.date.localeCompare(a.date));
+  referralRows.innerHTML=rows.map(o=>`<tr><td>${o.date}</td><td>${esc(getAccount(o.accountId)?.name||'-')}</td><td>${esc(o.platform)}</td><td><b>${esc(o.referralSourceClient||'Not set')}</b></td><td>${esc(o.clientName||'Not set')}</td><td>${money(o.amount)}</td><td>${o.referralPercent||0}%</td><td>${money(o.referralGross||0)}</td><td class="green">${money(o.referralNet||0)}</td><td>${o.referralLink?`<a href="${esc(o.referralLink)}" target="_blank" rel="noopener">Open</a>`:'-'}</td><td><button class="btn" onclick="editOrder('${o.id}')">Edit</button></td></tr>`).join('');
+}
+function exportReferralCSV(){
+  const header=['Date','Account','Platform','Referral Source Client','Used For Client','Order Amount','Referral %','Referral Gross','Referral Net','Referral Link'];
+  const rows=referralOrders().map(o=>[o.date,getAccount(o.accountId)?.name||'',o.platform,o.referralSourceClient||'',o.clientName||'',o.amount,o.referralPercent||0,o.referralGross||0,o.referralNet||0,o.referralLink||'']);
+  const csv=[header,...rows].map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='tracking-hub-referrals.csv';a.click();URL.revokeObjectURL(a.href)
+}
+
+function renderPrivate(){
+  if(privateContent.style.display==='block') refreshPrivate();
+}
+function unlockFinance(){if(pinInput.value===db.settings.pin){lockScreen.style.display='none';privateContent.style.display='block';refreshPrivate();pinInput.value=''}else alert('Incorrect PIN')}
+function lockFinance(){privateContent.style.display='none';lockScreen.style.display='block'}
+function refreshPrivate(){
+  const dos=dummyOrders(),recordedLoss=dos.reduce((s,o)=>s+Math.abs(o.profitLoss),0),extraLoss=(db.privateAdjustments||[]).filter(x=>x.kind==='dummy_loss_adjustment').reduce((s,x)=>s+(+x.amount||0),0),withdrawal=(db.privateAdjustments||[]).filter(x=>x.kind==='withdrawal_fee').reduce((s,x)=>s+(+x.amount||0),0),loss=recordedLoss+extraLoss,invest=dos.reduce((s,o)=>s+o.buyerPaid,0);
+  privateKpis.innerHTML=`<div class="card"><div class="kpi-label">Dummy Orders</div><div class="kpi-value redtxt">${dos.length}</div></div><div class="card"><div class="kpi-label">Dummy Loss</div><div class="kpi-value redtxt">${money(loss)}</div></div><div class="card"><div class="kpi-label">Dummy Investment</div><div class="kpi-value">${money(invest)}</div></div><div class="card"><div class="kpi-label">Average Recorded Loss</div><div class="kpi-value">${money(dos.length?recordedLoss/dos.length:0)}</div><div class="kpi-sub">Adjustments ${money(extraLoss)} • Withdrawal ${money(withdrawal)}</div></div>`;
+  const p={};dos.forEach(o=>{p[o.platform]=p[o.platform]||{count:0,invest:0,loss:0};p[o.platform].count++;p[o.platform].invest+=o.buyerPaid;p[o.platform].loss+=Math.abs(o.profitLoss)});
+  privatePlatformRows.innerHTML=Object.entries(p).map(([k,v])=>`<tr><td>${k}</td><td>${v.count}</td><td>${money(v.invest)}</td><td class="redtxt">${money(v.loss)}</td></tr>`).join('');
+  dummyRows.innerHTML=dos.map(o=>`<tr><td>${o.date}</td><td>${getAccount(o.accountId)?.name||'-'}</td><td>${o.platform}</td><td>${money(o.amount)}</td><td>${money(o.buyerPaid)}</td><td>${money(o.sellerReceives)}</td><td class="redtxt">${money(Math.abs(o.profitLoss))}</td></tr>`).join('');
+}
+
+function renderSettings(){settingRealFee.value=db.settings.realFee;settingDummyPayout.value=db.settings.dummyPayout;settingDiscount.value=db.settings.defaultDiscount;settingReferral.value=db.settings.defaultReferral??10;settingPin.value=''}
+function saveSettings(){db.settings.realFee=+settingRealFee.value||20;db.settings.dummyPayout=+settingDummyPayout.value||80;db.settings.defaultDiscount=+settingDiscount.value||0;db.settings.defaultReferral=+settingReferral.value||10;persist();toast('Settings saved')}
+function savePin(){if(settingPin.value.length<4){toast('Use at least 4 digits/characters');return}db.settings.pin=settingPin.value;settingPin.value='';persist();toast('PIN updated')}
+
+function generateReport(type){
+  if(type==='company'){
+    const ros=realOrders();reportOutput.innerHTML=`<h3>Company Summary</h3><p>Total Real Sales: <b>${money(ros.reduce((s,o)=>s+o.amount,0))}</b></p><p>Net Revenue: <b>${money(ros.reduce((s,o)=>s+o.sellerReceives,0))}</b></p><p>Real Orders: <b>${ros.length}</b></p>`;
+  }else if(type==='account'){
+    reportOutput.innerHTML=`<h3>Account Report</h3>${db.accounts.map(a=>{const t=totalsForAccount(a.id);return `<div class="statline"><span>${a.name}</span><b>${money(t.sales)} / ${money(t.net)}</b></div>`}).join('')}`;
+  }else{
+    reportOutput.innerHTML=`<h3>Manager Report</h3>${db.managers.map(m=>`<div class="statline"><span>${m.name}</span><b>${money(managerSales(m.id))} / ${money(m.target)}</b></div>`).join('')}`;
+  }
+}
+
+function exportCSV(){
+  const header=['Date','Account','Platform','Type','Order Amount','Discount %','Buyer Paid','Referral','Referral %','Referral Gross','Referral Net','Seller Receives','Profit/Loss','Manager','Status'];
+  const rows=db.orders.map(o=>[o.date,getAccount(o.accountId)?.name||'',o.platform,o.type,o.amount,o.discount||0,o.buyerPaid,o.hasReferral?'Yes':'No',o.referralPercent||0,o.referralGross||0,o.referralNet||0,o.type==='dummy'?'PRIVATE':o.sellerReceives,o.type==='dummy'?'PRIVATE':o.profitLoss,getManager(o.managerId)?.name||'',o.status]);
+  const csv=[header,...rows].map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='tracking-hub-orders.csv';a.click();URL.revokeObjectURL(a.href)
+}
+function downloadBackup(){const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='tracking-hub-backup.json';a.click();URL.revokeObjectURL(a.href)}
+function restoreBackup(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{db=JSON.parse(r.result);persist();init();toast('Backup restored')}catch(err){alert('Invalid backup file')}};r.readAsText(f)}
+function resetDemo(){if(confirm('Reset all local data to preloaded source data?')){db=clone(demoData);persist();init();toast('Source data restored')}}
+
+function openModal(id){document.getElementById(id).classList.add('show')}
+function closeModal(id){document.getElementById(id).classList.remove('show')}
+
+function init(){
+  populateSelects();
+  renderDashboard();renderOrders();renderAccounts();renderManagers();renderSettings();renderReferrals();
+  orderDate.value=new Date().toISOString().slice(0,10);
+  orderPlatformFee.value=db.settings.realFee;
+  orderReferralPercent.value=db.settings.defaultReferral??10;
+  toggleReferral();
+  calculateOrderPreview();
+}
+init();
+</script>
+</body>
+</html>
