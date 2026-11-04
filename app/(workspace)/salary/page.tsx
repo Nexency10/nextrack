@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { createRequestClient } from "@/lib/supabase/request";
 import { SalaryWorkspace, type PayrollRecord, type SalaryEmployee } from "@/components/salary/salary-workspace";
 
@@ -6,6 +7,7 @@ type SalaryPageProps = { searchParams: Promise<{ month?: string | string[] }> };
 
 export default async function SalaryPage({ searchParams }: SalaryPageProps) {
   const params = await searchParams;
+  await connection();
   const requestedMonth = Array.isArray(params.month) ? params.month[0] : params.month;
   const month = requestedMonth && /^\d{4}-(0[1-9]|1[0-2])$/.test(requestedMonth)
     ? requestedMonth

@@ -1,5 +1,6 @@
 -- Keep orders as the monthly source of truth. Each dashboard view aggregates
 -- only orders whose order_date falls within the selected calendar month.
+drop function if exists public.get_dashboard_metrics(date);
 drop function if exists public.get_dashboard_metrics();
 
 create function public.get_dashboard_metrics(p_month_start date)

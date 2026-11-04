@@ -655,6 +655,7 @@ grant execute on function public.get_dashboard_metrics() to authenticated;
 NOTIFY pgrst, 'reload schema';
 
 -- Monthly dashboard aggregates; prior months remain available from saved orders.
+drop function if exists public.get_dashboard_metrics(date);
 drop function if exists public.get_dashboard_metrics();
 
 create function public.get_dashboard_metrics(p_month_start date)
